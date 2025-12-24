@@ -1,4 +1,0 @@
-Gap analysis: 2025-04-22 to 2025-06-19
-Total rows: 673,009
-Total trades: 217,153
-Trades in gap: 67,154
