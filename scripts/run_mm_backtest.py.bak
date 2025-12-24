@@ -1,0 +1,149 @@
+"""Run the market-making backtest with strategy on sample data."""
+import sys
+from pathlib import Path
+
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import pandas as pd
+import matplotlib.pyplot as plt
+from src.market_making_backtest import MarketMakingBacktest
+from src.mm_handler import create_mm_handler
+from src.config_loader import load_strategy_config
+
+
+def run_mm_backtest(excel_file: str = 'TickData_Sample.xlsx', max_sheets: int = None, config_file: str = None, generate_plots: bool = True):
+    """Run market-making strategy on backtest data.
+    
+    Args:
+        excel_file: Path to Excel file (relative to project root)
+        max_sheets: Max sheets to process (None = all)
+        config_file: Path to JSON config file
+        generate_plots: Whether to generate plots after backtest
+    
+    Returns: dict of results per security
+    """
+    # Load market-making config from file if provided
+    mm_config = load_strategy_config(config_file) if config_file else {}
+    
+    # Create handler
+    mm_handler = create_mm_handler(config=mm_config)
+    
+    # Run backtest
+    backtest = MarketMakingBacktest()
+    print(f"\n{'='*70}")
+    print(f"MARKET-MAKING BACKTEST")
+    print(f"{'='*70}")
+    print(f"Excel file: {excel_file}")
+    print(f"Max sheets: {max_sheets if max_sheets else 'All'}")
+    print(f"Config file: {config_file if config_file else 'None (using defaults)'}")
+    print(f"{'='*70}\n")
+    
+    results = backtest.run_streaming(
+        file_path=excel_file,
+        handler=mm_handler,
+        max_sheets=max_sheets,
+        only_trades=False,  # Read all updates (bid/ask/trade)
+    )
+    
+    # Print results
+    print(f"\n{'='*70}")
+    print(f"BACKTEST RESULTS")
+    print(f"{'='*70}\n")
+    
+    for security in sorted(results.keys()):
+        data = results[security]
+        print(f"\n{security}:")
+        print(f"  Rows processed: {data['rows']:,}")
+        print(f"  Bids: {data['bid_count']:,} | Asks: {data['ask_count']:,} | Trades: {data['trade_count']:,}")
+        print(f"  Last price: ${data.get('last_price', 0):.3f}")
+        print(f"  Position: {data.get('position', 0):,}")
+        print(f"  Total P&L: ${data.get('pnl', 0):.2f}")
+        
+        trades = data.get('trades', [])
+        if trades:
+            print(f"  Trades executed: {len(trades)}")
+            for i, trade in enumerate(trades[:5], 1):  # Show first 5 trades
+                fill_qty = trade.get('fill_qty', 0)
+                fill_price = trade.get('fill_price', 0)
+                pnl = trade.get('pnl', 0)
+                side = trade.get('side', 'unknown')
+                print(f"    {i}. {side.upper():>4} {fill_qty:>8,} @ ${fill_price:>7.3f} | P&L: ${pnl:>10.2f}")
+            if len(trades) > 5:
+                print(f"    ... and {len(trades) - 5} more trades")
+    
+    print(f"\n{'='*70}\n")
+    
+    # Generate plots for each security with trades
+    if generate_plots:
+        output_dir = Path('output')
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        for security in sorted(results.keys()):
+            data = results[security]
+            trades = data.get('trades', [])
+            
+            if not trades:
+    p.add_argument('--no-plots', action='store_true', help='Disable plot generation')
+    args = p.parse_args()
+
+    results = run_mm_backtest(excel_file=args.excel_file, max_sheets=args.max_sheets, config_file=args.config_file, generate_plots=not args.no_plots
+            csv_path = output_dir / f"{security.lower()}_trades_timeseries.csv"
+            if not csv_path.exists():
+                print(f"Warning: CSV not found for {security} at {csv_path}")
+                continue
+                
+            try:
+                # Load the CSV data
+                trade_df = pd.read_csv(csv_path)
+                trade_df['timestamp'] = pd.to_datetime(trade_df['timestamp'])
+                
+                # Check if required columns exist
+                if 'position' not in trade_df.columns or 'pnl' not in trade_df.columns:
+                    print(f"Warning: Required columns (position/pnl) not found in CSV for {security}")
+                    continue
+                
+                # Create plots
+                fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+                
+                # Plot inventory
+                axes[0].plot(trade_df['timestamp'], trade_df['position'], color='tab:blue', linewidth=1.5)
+                axes[0].set_title(f'{security} - Inventory vs Time')
+                axes[0].set_ylabel('Position (shares)')
+                axes[0].grid(True, linestyle='--', alpha=0.3)
+                axes[0].axhline(y=0, color='red', linestyle='--', alpha=0.5)
+                
+                # Plot P&L
+                axes[1].plot(trade_df['timestamp'], trade_df['pnl'], color='tab:green', linewidth=1.5)
+                axes[1].set_title(f'{security} - P&L vs Time (realized)')
+                axes[1].set_ylabel('P&L (local currency)')
+                axes[1].set_xlabel('Time')
+                axes[1].grid(True, linestyle='--', alpha=0.3)
+                axes[1].axhline(y=0, color='red', linestyle='--', alpha=0.5)
+                
+                fig.autofmt_xdate()
+                plt.tight_layout()
+                
+                # Save plot
+                plot_path = output_dir / f"{security.lower()}_inventory_pnl.png"
+                plt.savefig(plot_path, dpi=144)
+                plt.close(fig)
+                
+                print(f"Generated plot: {plot_path}")
+                
+            except Exception as e:
+                print(f"Error generating plot for {security}: {e}")
+    
+    return results
+
+
+if __name__ == '__main__':
+    import argparse
+
+    p = argparse.ArgumentParser(description='Run market-making backtest (sample).')
+    p.add_argument('--excel-file', '-f', default='data/raw/TickData_Sample.xlsx', help='Path to Excel file')
+    p.add_argument('--max-sheets', '-m', default=None, type=int, help='Max number of sheets to process')
+    p.add_argument('--config-file', '-c', default=None, help='Path to JSON config file with per-security params')
+    args = p.parse_args()
+
+    results = run_mm_backtest(excel_file=args.excel_file, max_sheets=args.max_sheets, config_file=args.config_file)

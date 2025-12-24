@@ -1,0 +1,9 @@
+{
+  "EMAAR": {
+    "quote_size": 50000,
+    "refill_interval_sec": 180,
+    "max_position": 100000,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 25000
+  }
+}

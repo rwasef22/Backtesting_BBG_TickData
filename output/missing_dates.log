@@ -1,0 +1,7 @@
+elapsed_sec 2.94
+date_span 2025-04-14 2025-05-14
+missing_total 8
+found_in_gap True
+first_in_gap 2025-05-09
+gap_missing_count 2
+gap_missing_dates [datetime.date(2025, 5, 10), datetime.date(2025, 5, 11)]

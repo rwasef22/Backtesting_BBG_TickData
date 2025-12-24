@@ -1,0 +1,6 @@
+Starting plot generation...
+Path configured
+Imports successful
+Config loaded: ['EMAAR']
+Handler created
+Backtest initialized
