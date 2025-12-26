@@ -1,0 +1,114 @@
+{
+  "EMAAR": {
+    "quote_size": 32300,
+    "refill_interval_sec": 180,
+    "max_position": 64600,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 6460
+  },
+  "ALDAR": {
+    "quote_size": 3000,
+    "refill_interval_sec": 180,
+    "max_position": 6000,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 600
+  },
+  "ADNOCDRI": {
+    "quote_size": 5700,
+    "refill_interval_sec": 180,
+    "max_position": 11400,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 1140
+  },
+  "ADNOCGAS": {
+    "quote_size": 65000,
+    "refill_interval_sec": 180,
+    "max_position": 130000,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 13000
+  },
+  "ADNOCLS": {
+    "quote_size": 4500,
+    "refill_interval_sec": 180,
+    "max_position": 9000,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 900
+  },
+  "EAND": {
+    "quote_size": 2100,
+    "refill_interval_sec": 180,
+    "max_position": 4200,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 420
+  },
+  "ADCB": {
+    "quote_size": 3900,
+    "refill_interval_sec": 180,
+    "max_position": 7800,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 780
+  },
+  "ADIB": {
+    "quote_size": 1900,
+    "refill_interval_sec": 180,
+    "max_position": 3800,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 380
+  },
+  "EMIRATES": {
+    "quote_size": 3400,
+    "refill_interval_sec": 180,
+    "max_position": 6800,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 680
+  },
+  "TALABAT": {
+    "quote_size": 116500,
+    "refill_interval_sec": 180,
+    "max_position": 233000,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 23300
+  },
+  "SPINNEYS": {
+    "quote_size": 9700,
+    "refill_interval_sec": 180,
+    "max_position": 19400,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 1940
+  },
+  "FAB": {
+    "quote_size": 2400,
+    "refill_interval_sec": 180,
+    "max_position": 4800,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 480
+  },
+  "SALIK": {
+    "quote_size": 15200,
+    "refill_interval_sec": 180,
+    "max_position": 30400,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 3040
+  },
+  "PARKIN": {
+    "quote_size": 3400,
+    "refill_interval_sec": 180,
+    "max_position": 6800,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 680
+  },
+  "MULTIPLY": {
+    "quote_size": 39700,
+    "refill_interval_sec": 180,
+    "max_position": 79400,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 7940
+  },
+  "MODON": {
+    "quote_size": 7700,
+    "refill_interval_sec": 180,
+    "max_position": 15400,
+    "max_notional": 1500000,
+    "min_local_currency_before_quote": 1540
+  }
+}
