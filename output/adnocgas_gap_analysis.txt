@@ -1,0 +1,40 @@
+================================================================================
+ADNOCGAS Diagnostic Backtest
+================================================================================
+
+Configuration:
+  Quote Size: 65,000
+  Max Position: 130,000
+  Min Local Currency: 13,000
+  Refill Interval: 180s
+  Max Notional: 1,500,000
+
+================================================================================
+Daily Analysis - Non-Trading Days
+================================================================================
+
+
+================================================================================
+Summary
+================================================================================
+Total unique dates in data: 136
+Days with trading: 136
+Days without trading: 0
+Trading coverage: 100.0%
+
+Sample days with trading:
+  2025-04-14: 86 quotes, 5,177/5,271 liquidity checks passed
+  2025-04-15: 89 quotes, 6,786/6,841 liquidity checks passed
+  2025-04-16: 86 quotes, 4,397/4,434 liquidity checks passed
+  2025-04-17: 88 quotes, 5,571/5,631 liquidity checks passed
+  2025-04-18: 75 quotes, 1,314/1,339 liquidity checks passed
+  2025-04-21: 84 quotes, 2,099/2,129 liquidity checks passed
+  2025-04-22: 86 quotes, 6,656/6,685 liquidity checks passed
+  2025-04-23: 88 quotes, 4,248/4,258 liquidity checks passed
+  2025-04-24: 87 quotes, 5,317/5,367 liquidity checks passed
+  2025-04-25: 92 quotes, 8,501/8,568 liquidity checks passed
+  ... and 126 more days
+
+================================================================================
+Analysis complete. Found 0 non-trading days.
+================================================================================

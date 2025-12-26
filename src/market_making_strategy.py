@@ -90,6 +90,16 @@ class MarketMakingStrategy:
         except Exception:
             return False
     
+    def is_in_silent_period(self, timestamp: datetime) -> bool:
+        """Check if timestamp is during silent period (10:00-10:05)."""
+        try:
+            if isinstance(timestamp, str):
+                timestamp = pd.to_datetime(timestamp)
+            t = timestamp.time()
+            return time(10, 0, 0) <= t < time(10, 5, 0)
+        except Exception:
+            return False
+    
     def is_eod_close_time(self, timestamp: datetime) -> bool:
         """Check if timestamp is at or after EOD close time (14:55)."""
         try:
@@ -106,7 +116,13 @@ class MarketMakingStrategy:
                self.should_refill_side(security, timestamp, 'ask')
 
     def should_refill_side(self, security: str, timestamp: datetime, side: str) -> bool:
-        """Check if it's time to refill a given side ('bid' or 'ask')."""
+        """Check if it's time to refill a given side ('bid' or 'ask').
+        
+        Refill logic:
+        - After placing a quote (or trade), wait refill_interval before placing new quote
+        - Refill time is set when quote passes liquidity check and is placed
+        - This allows quotes to "stick" for the interval and have chance to get filled
+        """
         cfg = self.get_config(security)
         interval_sec = cfg['refill_interval_sec']
 
@@ -119,6 +135,9 @@ class MarketMakingStrategy:
                 timestamp = pd.to_datetime(timestamp)
 
             elapsed = (timestamp - last).total_seconds()
+            # Only enforce interval if we had a trade on this side
+            # Otherwise, always check (return True)
+            # The refill_time gets set only after successful trades in process_trade
             return elapsed >= interval_sec
         except Exception:
             return True
@@ -137,6 +156,8 @@ class MarketMakingStrategy:
         
         Returns: {'bid_price': float, 'ask_price': float, 'bid_size': float, 'ask_size': float}
         """
+        # FIX: Allow quoting even if only one side is available
+        # Previously returned None if both sides were None, blocking one-sided quotes
         if best_bid is None and best_ask is None:
             return None
         
@@ -164,11 +185,11 @@ class MarketMakingStrategy:
         # Determine how much we can quote based on position limits
         current_pos = self.position[security]
         
-        # Max we can buy (go long)
+        # Max we can buy (go long): limited by distance to +max_pos
         bid_size = 0 if bid_price is None else min(bid_quote_size, int(max_pos - current_pos))
         bid_size = max(0, bid_size)
         
-        # Max we can sell (go short)
+        # Max we can sell (go short): limited by distance to -max_pos
         ask_size = 0 if ask_price is None else min(ask_quote_size, int(max_pos + current_pos))
         ask_size = max(0, ask_size)
         
@@ -331,6 +352,10 @@ class MarketMakingStrategy:
             'position': self.position[security],
             'pnl': self.pnl[security],
         })
+        
+        # After a fill, reset refill time to start new cooldown period
+        # This prevents requoting immediately after being filled
+        self.set_refill_time(security, side, timestamp)
  
     
     def flatten_position(self, security: str, close_price: float, timestamp: datetime):

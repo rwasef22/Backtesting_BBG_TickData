@@ -1,0 +1,3 @@
+﻿Running EMAAR backtest (5-min refill) with config configs/mm_config.json to collect metrics...
+Saved plots to output\emaar_5min_inventory_pnl.png
+Saved time series CSV to output\emaar_5min_trades_timeseries.csv

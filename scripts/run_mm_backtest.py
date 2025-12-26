@@ -12,7 +12,7 @@ from src.mm_handler import create_mm_handler
 from src.config_loader import load_strategy_config
 
 
-def run_mm_backtest(excel_file: str = 'TickData_Sample.xlsx', max_sheets: int = None, config_file: str = None, generate_plots: bool = True):
+def run_mm_backtest(excel_file: str = 'TickData_Sample.xlsx', max_sheets: int = None, config_file: str = None, generate_plots: bool = True, chunk_size: int = 100000):
     """Run market-making strategy on backtest data.
     
     Args:
@@ -20,6 +20,7 @@ def run_mm_backtest(excel_file: str = 'TickData_Sample.xlsx', max_sheets: int = 
         max_sheets: Max sheets to process (None = all)
         config_file: Path to JSON config file
         generate_plots: Whether to generate plots after backtest
+        chunk_size: Number of rows per chunk (default 100000)
     
     Returns: dict of results per security
     """
@@ -37,6 +38,7 @@ def run_mm_backtest(excel_file: str = 'TickData_Sample.xlsx', max_sheets: int = 
     print(f"Excel file: {excel_file}")
     print(f"Max sheets: {max_sheets if max_sheets else 'All'}")
     print(f"Config file: {config_file if config_file else 'None (using defaults)'}")
+    print(f"Chunk size: {chunk_size}")
     print(f"{'='*70}\n")
     
     results = backtest.run_streaming(
@@ -44,6 +46,7 @@ def run_mm_backtest(excel_file: str = 'TickData_Sample.xlsx', max_sheets: int = 
         handler=mm_handler,
         max_sheets=max_sheets,
         only_trades=False,  # Read all updates (bid/ask/trade)
+        chunk_size=chunk_size,
     )
     
     # Print results
@@ -112,10 +115,12 @@ def run_mm_backtest(excel_file: str = 'TickData_Sample.xlsx', max_sheets: int = 
         print(f"  Coverage: {coverage_pct:.1f}%")
         print(f"\n{'='*70}\n")
     
+    # Set up output directory
+    output_dir = Path('output')
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
     # Generate plots for each security with trades
     if generate_plots:
-        output_dir = Path('output')
-        output_dir.mkdir(parents=True, exist_ok=True)
         
         for security in sorted(results.keys()):
             data = results[security]
@@ -198,6 +203,97 @@ def run_mm_backtest(excel_file: str = 'TickData_Sample.xlsx', max_sheets: int = 
                 
             except Exception as e:
                 print(f"Error generating plot for {security}: {e}")
+    
+    # Generate performance summary table
+    print("\n" + "="*120)
+    print("GENERATING PERFORMANCE SUMMARY")
+    print("="*120)
+    
+    try:
+        from glob import glob
+        csv_files = glob(str(output_dir / '*_trades_timeseries.csv'))
+        
+        summary_results = []
+        
+        for csv_file in sorted(csv_files):
+            security = Path(csv_file).stem.replace('_trades_timeseries', '').upper()
+            
+            try:
+                df = pd.read_csv(csv_file)
+                
+                if df.empty:
+                    continue
+                
+                # Calculate statistics
+                num_trades = len(df)
+                final_pnl = df['pnl'].iloc[-1] if 'pnl' in df.columns else 0
+                final_position = df['position'].iloc[-1] if 'position' in df.columns else 0
+                
+                # Trading days
+                df['date'] = pd.to_datetime(df['timestamp']).dt.date
+                trading_days = df['date'].nunique()
+                
+                # Buy/Sell split
+                buys = len(df[df['side'] == 'buy'])
+                sells = len(df[df['side'] == 'sell'])
+                
+                # Average trade size
+                avg_qty = df['fill_qty'].mean()
+                
+                # Trade value
+                total_value = (df['fill_qty'] * df['fill_price']).sum()
+                
+                summary_results.append({
+                    'Security': security,
+                    'Trades': num_trades,
+                    'Trading Days': trading_days,
+                    'Buys': buys,
+                    'Sells': sells,
+                    'Avg Qty': int(avg_qty),
+                    'Total Value ($)': int(total_value),
+                    'Final P&L ($)': round(final_pnl, 2),
+                    'Final Position': int(final_position)
+                })
+                
+            except Exception as e:
+                print(f"Error processing {security}: {e}")
+                continue
+        
+        # Create DataFrame and display
+        if summary_results:
+            summary_df = pd.DataFrame(summary_results)
+            
+            # Sort by P&L descending
+            summary_df = summary_df.sort_values('Final P&L ($)', ascending=False)
+            
+            # Add totals row
+            totals = {
+                'Security': 'TOTAL',
+                'Trades': summary_df['Trades'].sum(),
+                'Trading Days': '-',
+                'Buys': summary_df['Buys'].sum(),
+                'Sells': summary_df['Sells'].sum(),
+                'Avg Qty': '-',
+                'Total Value ($)': summary_df['Total Value ($)'].sum(),
+                'Final P&L ($)': summary_df['Final P&L ($)'].sum(),
+                'Final Position': summary_df['Final Position'].sum()
+            }
+            
+            summary_df = pd.concat([summary_df, pd.DataFrame([totals])], ignore_index=True)
+            
+            print("\n" + "="*120)
+            print("PERFORMANCE SUMMARY")
+            print("="*120)
+            print(summary_df.to_string(index=False))
+            print("="*120)
+            
+            # Save to file
+            summary_path = output_dir / 'performance_summary.csv'
+            summary_df.to_csv(summary_path, index=False)
+            print(f"\nPerformance summary saved to {summary_path}")
+        
+    except Exception as e:
+        print(f"Error generating performance summary: {e}")
     
     return results
 

@@ -1,0 +1,558 @@
+
+======================================================================
+MARKET-MAKING BACKTEST
+======================================================================
+Excel file: data/raw/TickData.xlsx
+Max sheets: All
+Config file: configs/mm_config.json
+Chunk size: 100000
+======================================================================
+
+Processing chunk 1: 100000 rows for EMAAR UH Equity
+  After chunk 1: 1880 total trades
+Processing chunk 2: 100000 rows for EMAAR UH Equity
+  After chunk 2: 3500 total trades
+Processing chunk 3: 100000 rows for EMAAR UH Equity
+  After chunk 3: 5181 total trades
+Processing chunk 4: 100000 rows for EMAAR UH Equity
+  After chunk 4: 7175 total trades
+Processing chunk 5: 100000 rows for EMAAR UH Equity
+  After chunk 5: 9127 total trades
+Processing chunk 6: 100000 rows for EMAAR UH Equity
+  After chunk 6: 10874 total trades
+Processing chunk 7: 81197 rows for EMAAR UH Equity
+  After chunk 7: 11903 total trades
+Processing chunk 8: 100000 rows for ALDAR UH Equity
+  After chunk 8: 1582 total trades
+Processing chunk 9: 100000 rows for ALDAR UH Equity
+  After chunk 9: 2745 total trades
+Processing chunk 10: 100000 rows for ALDAR UH Equity
+  After chunk 10: 3947 total trades
+Processing chunk 11: 100000 rows for ALDAR UH Equity
+  After chunk 11: 5417 total trades
+Processing chunk 12: 100000 rows for ALDAR UH Equity
+  After chunk 12: 6919 total trades
+Processing chunk 13: 100000 rows for ALDAR UH Equity
+  After chunk 13: 8425 total trades
+Processing chunk 14: 100000 rows for ALDAR UH Equity
+  After chunk 14: 9969 total trades
+Processing chunk 15: 79300 rows for ALDAR UH Equity
+  After chunk 15: 11102 total trades
+Processing chunk 16: 100000 rows for ADNOCDRI UH Equity
+  After chunk 16: 1234 total trades
+Processing chunk 17: 100000 rows for ADNOCDRI UH Equity
+  After chunk 17: 2395 total trades
+Processing chunk 18: 100000 rows for ADNOCDRI UH Equity
+  After chunk 18: 3733 total trades
+Processing chunk 19: 100000 rows for ADNOCDRI UH Equity
+  After chunk 19: 4971 total trades
+Processing chunk 20: 100000 rows for ADNOCDRI UH Equity
+  After chunk 20: 6274 total trades
+Processing chunk 21: 100000 rows for ADNOCDRI UH Equity
+  After chunk 21: 7392 total trades
+Processing chunk 22: 24155 rows for ADNOCDRI UH Equity
+  After chunk 22: 7649 total trades
+Processing chunk 23: 100000 rows for ADNOCGAS UH Equity
+  After chunk 23: 1316 total trades
+Processing chunk 24: 100000 rows for ADNOCGAS UH Equity
+  After chunk 24: 2123 total trades
+Processing chunk 25: 100000 rows for ADNOCGAS UH Equity
+  After chunk 25: 3488 total trades
+Processing chunk 26: 100000 rows for ADNOCGAS UH Equity
+  After chunk 26: 4565 total trades
+Processing chunk 27: 100000 rows for ADNOCGAS UH Equity
+  After chunk 27: 5352 total trades
+Processing chunk 28: 100000 rows for ADNOCGAS UH Equity
+  After chunk 28: 6362 total trades
+Processing chunk 29: 17598 rows for ADNOCGAS UH Equity
+  After chunk 29: 6529 total trades
+Processing chunk 30: 100000 rows for ADNOCLS UH Equity
+  After chunk 30: 1491 total trades
+Processing chunk 31: 100000 rows for ADNOCLS UH Equity
+  After chunk 31: 2861 total trades
+Processing chunk 32: 100000 rows for ADNOCLS UH Equity
+  After chunk 32: 4157 total trades
+Processing chunk 33: 100000 rows for ADNOCLS UH Equity
+  After chunk 33: 5327 total trades
+Processing chunk 34: 36106 rows for ADNOCLS UH Equity
+  After chunk 34: 5791 total trades
+Processing chunk 35: 100000 rows for EAND UH Equity
+  After chunk 35: 1722 total trades
+Processing chunk 36: 100000 rows for EAND UH Equity
+  After chunk 36: 3413 total trades
+Processing chunk 37: 100000 rows for EAND UH Equity
+  After chunk 37: 5518 total trades
+Processing chunk 38: 100000 rows for EAND UH Equity
+  After chunk 38: 7488 total trades
+Processing chunk 39: 42794 rows for EAND UH Equity
+  After chunk 39: 8348 total trades
+Processing chunk 40: 100000 rows for ADCB UH Equity
+  After chunk 40: 1817 total trades
+Processing chunk 41: 100000 rows for ADCB UH Equity
+  After chunk 41: 3620 total trades
+Processing chunk 42: 100000 rows for ADCB UH Equity
+  After chunk 42: 5544 total trades
+Processing chunk 43: 100000 rows for ADCB UH Equity
+  After chunk 43: 7737 total trades
+Processing chunk 44: 100000 rows for ADCB UH Equity
+  After chunk 44: 9689 total trades
+Processing chunk 45: 100000 rows for ADCB UH Equity
+  After chunk 45: 11692 total trades
+Processing chunk 46: 60787 rows for ADCB UH Equity
+  After chunk 46: 12861 total trades
+Processing chunk 47: 100000 rows for ADIB DH Equity
+  After chunk 47: 1927 total trades
+Processing chunk 48: 100000 rows for ADIB DH Equity
+  After chunk 48: 3640 total trades
+Processing chunk 49: 100000 rows for ADIB DH Equity
+  After chunk 49: 5531 total trades
+Processing chunk 50: 100000 rows for ADIB DH Equity
+  After chunk 50: 7762 total trades
+Processing chunk 51: 100000 rows for ADIB DH Equity
+  After chunk 51: 9824 total trades
+Processing chunk 52: 100000 rows for ADIB DH Equity
+  After chunk 52: 11999 total trades
+Processing chunk 53: 11161 rows for ADIB DH Equity
+  After chunk 53: 12232 total trades
+Processing chunk 54: 100000 rows for EMIRATES UH Equity
+  After chunk 54: 2109 total trades
+Processing chunk 55: 100000 rows for EMIRATES UH Equity
+  After chunk 55: 4317 total trades
+Processing chunk 56: 100000 rows for EMIRATES UH Equity
+  After chunk 56: 6527 total trades
+Processing chunk 57: 100000 rows for EMIRATES UH Equity
+  After chunk 57: 9183 total trades
+Processing chunk 58: 100000 rows for EMIRATES UH Equity
+  After chunk 58: 11830 total trades
+Processing chunk 59: 18592 rows for EMIRATES UH Equity
+  After chunk 59: 12210 total trades
+Processing chunk 60: 100000 rows for TALABAT UH Equity
+  After chunk 60: 1561 total trades
+Processing chunk 61: 100000 rows for TALABAT UH Equity
+  After chunk 61: 2975 total trades
+Processing chunk 62: 100000 rows for TALABAT UH Equity
+  After chunk 62: 4078 total trades
+Processing chunk 63: 34015 rows for TALABAT UH Equity
+  After chunk 63: 5686 total trades
+Processing chunk 64: 51465 rows for SPINNEYS UH Equity
+  After chunk 64: 711 total trades
+Processing chunk 65: 100000 rows for FAB UH Equity
+  After chunk 65: 1637 total trades
+Processing chunk 66: 100000 rows for FAB UH Equity
+  After chunk 66: 3054 total trades
+Processing chunk 67: 100000 rows for FAB UH Equity
+  After chunk 67: 4574 total trades
+Processing chunk 68: 100000 rows for FAB UH Equity
+  After chunk 68: 6573 total trades
+Processing chunk 69: 100000 rows for FAB UH Equity
+  After chunk 69: 8265 total trades
+Processing chunk 70: 41931 rows for FAB UH Equity
+  After chunk 70: 8920 total trades
+Processing chunk 71: 100000 rows for SALIK UH Equity
+  After chunk 71: 2235 total trades
+Processing chunk 72: 100000 rows for SALIK UH Equity
+  After chunk 72: 4990 total trades
+Processing chunk 73: 100000 rows for SALIK UH Equity
+  After chunk 73: 8195 total trades
+Processing chunk 74: 100000 rows for SALIK UH Equity
+  After chunk 74: 12187 total trades
+Processing chunk 75: 100000 rows for SALIK UH Equity
+  After chunk 75: 16289 total trades
+Processing chunk 76: 54335 rows for SALIK UH Equity
+  After chunk 76: 18037 total trades
+Processing chunk 77: 100000 rows for PARKIN UH Equity
+  After chunk 77: 2439 total trades
+Processing chunk 78: 100000 rows for PARKIN UH Equity
+  After chunk 78: 5119 total trades
+Processing chunk 79: 98764 rows for PARKIN UH Equity
+  After chunk 79: 7371 total trades
+Processing chunk 80: 100000 rows for MULTIPLY UH Equity
+  After chunk 80: 2048 total trades
+Processing chunk 81: 100000 rows for MULTIPLY UH Equity
+  After chunk 81: 4212 total trades
+Processing chunk 82: 100000 rows for MULTIPLY UH Equity
+  After chunk 82: 6552 total trades
+Processing chunk 83: 100000 rows for MULTIPLY UH Equity
+  After chunk 83: 8901 total trades
+Processing chunk 84: 22483 rows for MULTIPLY UH Equity
+  After chunk 84: 9400 total trades
+Processing chunk 85: 100000 rows for MODON UH Equity
+  After chunk 85: 2074 total trades
+Processing chunk 86: 100000 rows for MODON UH Equity
+  After chunk 86: 4088 total trades
+Processing chunk 87: 4777 rows for MODON UH Equity
+  After chunk 87: 4167 total trades
+
+Total chunks processed: 87
+
+======================================================================
+BACKTEST RESULTS
+======================================================================
+
+
+ADCB:
+  Rows processed: 605,959
+  Bids: 218,557 | Asks: 214,545 | Trades: 172,857
+  Last price: $15.500
+  Position: 0
+  Total P&L: $-39066.68
+
+  Trading Statistics:
+    Market trading days: 136
+    Strategy traded days: 135
+    Days with NO strategy trades: 1
+    Missed dates: 2025-07-14
+
+  Sample trades (first 5 of 12861):
+    1. SELL    1,333 @ $ 10.400 | P&L: $      0.00
+    2. SELL    2,567 @ $ 10.400 | P&L: $      0.00
+    3.  BUY        0 @ $ 10.400 | P&L: $      0.00
+    4.  BUY    3,900 @ $ 10.360 | P&L: $      0.00
+    5.  BUY      530 @ $ 10.360 | P&L: $      0.00
+    ... and 12856 more trades
+
+ADIB:
+  Rows processed: 557,056
+  Bids: 198,500 | Asks: 191,266 | Trades: 167,290
+  Last price: $21.880
+  Position: 0
+  Total P&L: $-25546.38
+
+  Trading Statistics:
+    Market trading days: 136
+    Strategy traded days: 136
+
+  Sample trades (first 5 of 12232):
+    1.  BUY      316 @ $ 16.280 | P&L: $      0.00
+    2.  BUY      500 @ $ 16.280 | P&L: $      0.00
+    3.  BUY    1,084 @ $ 16.280 | P&L: $      0.00
+    4. SELL        0 @ $ 16.300 | P&L: $     38.00
+    5.  BUY    1,900 @ $ 16.320 | P&L: $     38.00
+    ... and 12227 more trades
+
+ADNOCDRI:
+  Rows processed: 568,118
+  Bids: 191,671 | Asks: 205,251 | Trades: 171,196
+  Last price: $5.800
+  Position: 0
+  Total P&L: $7431.82
+
+  Trading Statistics:
+    Market trading days: 136
+    Strategy traded days: 136
+
+  Sample trades (first 5 of 7649):
+    1. SELL      998 @ $  4.960 | P&L: $      0.00
+    2. SELL    3,265 @ $  4.960 | P&L: $      0.00
+    3.  BUY    1,437 @ $  4.930 | P&L: $    127.89
+    4.  BUY    4,361 @ $  4.920 | P&L: $    127.89
+    5.  BUY      150 @ $  4.930 | P&L: $    127.89
+    ... and 7644 more trades
+
+ADNOCGAS:
+  Rows processed: 555,228
+  Bids: 195,688 | Asks: 190,451 | Trades: 169,089
+  Last price: $3.590
+  Position: 0
+  Total P&L: $171213.28
+
+  Trading Statistics:
+    Market trading days: 136
+    Strategy traded days: 136
+
+  Sample trades (first 5 of 6529):
+    1. SELL   65,000 @ $  2.990 | P&L: $      0.00
+    2.  BUY        0 @ $  2.990 | P&L: $      0.00
+    3.  BUY   39,757 @ $  2.990 | P&L: $      0.00
+    4.  BUY   10,243 @ $  2.990 | P&L: $      0.00
+    5.  BUY   15,000 @ $  2.990 | P&L: $      0.00
+    ... and 6524 more trades
+
+ADNOCLS:
+  Rows processed: 401,058
+  Bids: 146,808 | Asks: 139,119 | Trades: 115,131
+  Last price: $5.880
+  Position: 0
+  Total P&L: $6201.94
+
+  Trading Statistics:
+    Market trading days: 136
+    Strategy traded days: 136
+
+  Sample trades (first 5 of 5791):
+    1. SELL    2,101 @ $  4.350 | P&L: $      0.00
+    2. SELL      650 @ $  4.350 | P&L: $      0.00
+    3. SELL    2,730 @ $  4.350 | P&L: $      0.00
+    4. SELL       83 @ $  4.360 | P&L: $      0.00
+    5. SELL    1,687 @ $  4.350 | P&L: $      0.00
+    ... and 5786 more trades
+
+ALDAR:
+  Rows processed: 708,493
+  Bids: 237,908 | Asks: 261,578 | Trades: 209,007
+  Last price: $9.490
+  Position: 0
+  Total P&L: $-16229.39
+
+  Trading Statistics:
+    Market trading days: 136
+    Strategy traded days: 136
+
+  Sample trades (first 5 of 11102):
+    1. SELL    3,000 @ $  7.890 | P&L: $      0.00
+    2. SELL    3,000 @ $  7.910 | P&L: $      0.00
+    3.  BUY        0 @ $  7.900 | P&L: $      0.00
+    4.  BUY        0 @ $  7.900 | P&L: $      0.00
+    5. SELL    3,000 @ $  7.900 | P&L: $      0.00
+    ... and 11097 more trades
+
+EAND:
+  Rows processed: 398,473
+  Bids: 141,892 | Asks: 143,069 | Trades: 113,512
+  Last price: $19.280
+  Position: 0
+  Total P&L: $13420.14
+
+  Trading Statistics:
+    Market trading days: 136
+    Strategy traded days: 135
+    Days with NO strategy trades: 1
+    Missed dates: 2025-07-31
+
+  Sample trades (first 5 of 8348):
+    1.  BUY       34 @ $ 16.680 | P&L: $      0.00
+    2.  BUY      299 @ $ 16.680 | P&L: $      0.00
+    3.  BUY       59 @ $ 16.680 | P&L: $      0.00
+    4.  BUY        5 @ $ 16.680 | P&L: $      0.00
+    5.  BUY       50 @ $ 16.680 | P&L: $      0.00
+    ... and 8343 more trades
+
+EMAAR:
+  Rows processed: 628,297
+  Bids: 216,927 | Asks: 222,628 | Trades: 188,742
+  Last price: $14.450
+  Position: 0
+  Total P&L: $312211.05
+
+  Trading Statistics:
+    Market trading days: 136
+    Strategy traded days: 136
+
+  Sample trades (first 5 of 11903):
+    1. SELL    2,452 @ $ 12.250 | P&L: $      0.00
+    2. SELL      300 @ $ 12.300 | P&L: $      0.00
+    3. SELL    2,952 @ $ 12.300 | P&L: $      0.00
+    4. SELL    2,048 @ $ 12.300 | P&L: $      0.00
+    5. SELL      450 @ $ 12.300 | P&L: $      0.00
+    ... and 11898 more trades
+
+EMIRATES:
+  Rows processed: 488,550
+  Bids: 183,746 | Asks: 172,669 | Trades: 132,135
+  Last price: $27.800
+  Position: 0
+  Total P&L: $19260.65
+
+  Trading Statistics:
+    Market trading days: 136
+    Strategy traded days: 136
+
+  Sample trades (first 5 of 12210):
+    1. SELL      274 @ $ 19.450 | P&L: $      0.00
+    2. SELL    2,003 @ $ 19.450 | P&L: $      0.00
+    3. SELL    1,123 @ $ 19.450 | P&L: $      0.00
+    4. SELL       94 @ $ 19.650 | P&L: $      0.00
+    5. SELL      169 @ $ 19.700 | P&L: $      0.00
+    ... and 12205 more trades
+
+FAB:
+  Rows processed: 492,932
+  Bids: 176,856 | Asks: 179,092 | Trades: 136,984
+  Last price: $17.060
+  Position: 0
+  Total P&L: $-6022.60
+
+  Trading Statistics:
+    Market trading days: 136
+    Strategy traded days: 136
+
+  Sample trades (first 5 of 8920):
+    1. SELL    1,629 @ $ 13.380 | P&L: $      0.00
+    2. SELL      771 @ $ 13.380 | P&L: $      0.00
+    3.  BUY        0 @ $ 13.380 | P&L: $      0.00
+    4.  BUY        0 @ $ 13.380 | P&L: $      0.00
+    5.  BUY      152 @ $ 13.340 | P&L: $      0.00
+    ... and 8915 more trades
+
+MODON:
+  Rows processed: 186,115
+  Bids: 65,994 | Asks: 65,460 | Trades: 54,661
+  Last price: $3.660
+  Position: 0
+  Total P&L: $10259.72
+
+  Trading Statistics:
+    Market trading days: 136
+    Strategy traded days: 136
+
+  Sample trades (first 5 of 4167):
+    1.  BUY    7,700 @ $  2.680 | P&L: $      0.00
+    2.  BUY    7,700 @ $  2.690 | P&L: $      0.00
+    3. SELL        0 @ $  2.700 | P&L: $    115.50
+    4.  BUY    6,101 @ $  2.680 | P&L: $    115.50
+    5.  BUY    1,599 @ $  2.680 | P&L: $    115.50
+    ... and 4162 more trades
+
+MULTIPLY:
+  Rows processed: 379,943
+  Bids: 124,462 | Asks: 131,717 | Trades: 123,764
+  Last price: $3.070
+  Position: 0
+  Total P&L: $97688.62
+
+  Trading Statistics:
+    Market trading days: 136
+    Strategy traded days: 136
+
+  Sample trades (first 5 of 9400):
+    1. SELL   39,700 @ $  1.640 | P&L: $      0.00
+    2. SELL   39,700 @ $  1.640 | P&L: $      0.00
+    3.  BUY        0 @ $  1.650 | P&L: $   -363.54
+    4.  BUY        0 @ $  1.650 | P&L: $   -397.00
+    5. SELL   18,561 @ $  1.650 | P&L: $   -397.00
+    ... and 9395 more trades
+
+PARKIN:
+  Rows processed: 277,937
+  Bids: 98,750 | Asks: 92,718 | Trades: 86,469
+  Last price: $5.480
+  Position: 0
+  Total P&L: $-4478.07
+
+  Trading Statistics:
+    Market trading days: 136
+    Strategy traded days: 136
+
+  Sample trades (first 5 of 7371):
+    1. SELL    2,514 @ $  4.740 | P&L: $      0.00
+    2. SELL      886 @ $  4.740 | P&L: $      0.00
+    3. SELL    3,400 @ $  4.740 | P&L: $      0.00
+    4.  BUY        0 @ $  4.740 | P&L: $      0.00
+    5. SELL      598 @ $  4.770 | P&L: $      0.00
+    ... and 7366 more trades
+
+SALIK:
+  Rows processed: 517,456
+  Bids: 180,998 | Asks: 172,532 | Trades: 163,926
+  Last price: $5.830
+  Position: 0
+  Total P&L: $25529.77
+
+  Trading Statistics:
+    Market trading days: 136
+    Strategy traded days: 136
+
+  Sample trades (first 5 of 18037):
+    1.  BUY    1,200 @ $  5.060 | P&L: $      0.00
+    2.  BUY   14,000 @ $  5.060 | P&L: $      0.00
+    3.  BUY       10 @ $  5.060 | P&L: $      0.00
+    4.  BUY      333 @ $  5.050 | P&L: $      0.00
+    5.  BUY    1,667 @ $  5.050 | P&L: $      0.00
+    ... and 18032 more trades
+
+SPINNEYS:
+  Rows processed: 45,145
+  Bids: 18,219 | Asks: 16,394 | Trades: 10,532
+  Last price: $1.560
+  Position: 0
+  Total P&L: $6181.50
+
+  Trading Statistics:
+    Market trading days: 136
+    Strategy traded days: 111
+    Days with NO strategy trades: 25
+    Missed dates: 2025-04-18, 2025-04-22, 2025-04-25, 2025-05-07, 2025-05-08, 2025-05-09, 2025-05-12, 2025-05-21, 2025-05-23, 2025-05-28
+      ... and 15 more dates
+
+  Sample trades (first 5 of 711):
+    1. SELL    2,091 @ $  1.520 | P&L: $      0.00
+    2. SELL    9,700 @ $  1.530 | P&L: $      0.00
+    3. SELL    1,800 @ $  1.520 | P&L: $      0.00
+    4. SELL    5,095 @ $  1.520 | P&L: $      0.00
+    5. SELL      714 @ $  1.520 | P&L: $      0.00
+    ... and 706 more trades
+
+TALABAT:
+  Rows processed: 308,994
+  Bids: 104,078 | Asks: 110,348 | Trades: 94,568
+  Last price: $0.970
+  Position: 0
+  Total P&L: $119067.29
+
+  Trading Statistics:
+    Market trading days: 136
+    Strategy traded days: 136
+
+  Sample trades (first 5 of 5686):
+    1.  BUY  116,500 @ $  1.330 | P&L: $      0.00
+    2. SELL        0 @ $  1.320 | P&L: $    -38.96
+    3. SELL        0 @ $  1.320 | P&L: $   -199.65
+    4. SELL        0 @ $  1.320 | P&L: $   -371.26
+    5. SELL        0 @ $  1.320 | P&L: $   -421.26
+    ... and 5681 more trades
+
+======================================================================
+
+OVERALL TRADING STATISTICS:
+  Total market trading days (all securities): 2176
+  Total strategy trading days: 2149
+  Total days with NO strategy trades: 27
+  Coverage: 98.8%
+
+======================================================================
+
+Generated plot: output\adcb_inventory_pnl.png
+Generated plot: output\adib_inventory_pnl.png
+Generated plot: output\adnocdri_inventory_pnl.png
+Generated plot: output\adnocgas_inventory_pnl.png
+Generated plot: output\adnocls_inventory_pnl.png
+Generated plot: output\aldar_inventory_pnl.png
+Generated plot: output\eand_inventory_pnl.png
+Generated plot: output\emaar_inventory_pnl.png
+Generated plot: output\emirates_inventory_pnl.png
+Generated plot: output\fab_inventory_pnl.png
+Generated plot: output\modon_inventory_pnl.png
+Generated plot: output\multiply_inventory_pnl.png
+Generated plot: output\parkin_inventory_pnl.png
+Generated plot: output\salik_inventory_pnl.png
+Generated plot: output\spinneys_inventory_pnl.png
+Generated plot: output\talabat_inventory_pnl.png
+
+========================================================================================================================
+GENERATING PERFORMANCE SUMMARY
+========================================================================================================================
+
+========================================================================================================================
+PERFORMANCE SUMMARY
+========================================================================================================================
+Security  Trades Trading Days  Buys  Sells Avg Qty  Total Value ($)  Final P&L ($)  Final Position
+   EMAAR   11903          136  6041   5862    2708        445372208      312211.05               0
+ADNOCGAS    6529          136  3319   3210    8253        179578705      171213.28               0
+ TALABAT    5686          136  3046   2640   11924         83027926      119067.29               0
+MULTIPLY    9400          136  4727   4673    6975        167901919       97688.62               0
+   SALIK   18037          136  9325   8712    1497        160220848       25529.77               0
+EMIRATES   12210          136  6121   6089     446        131230926       19260.65               0
+    EAND    8348          135  4194   4154     441         65825066       13420.14               0
+   MODON    4167          136  2175   1992    2292         33154124       10259.72               0
+ADNOCDRI    7649          136  3868   3781    1259         53594204        7431.82               0
+ ADNOCLS    5791          136  2897   2894    1207         35267073        6201.94               0
+SPINNEYS     711          111   340    371    2792          3051786        6181.50               0
+  PARKIN    7371          136  3877   3494     675         29727222       -4478.07               0
+     FAB    8920          136  4537   4383     547         79919910       -6022.60               0
+   ALDAR   11102          136  5539   5563     752         75295242      -16229.39               0
+    ADIB   12232          136  6178   6054     388        100381521      -25546.38               0
+    ADCB   12861          135  6463   6398     685        121515730      -39066.68               0
+   TOTAL  142917            - 72647  70270       -       1765064410      697122.66               0
+========================================================================================================================
+
+Performance summary saved to output\performance_summary.csv

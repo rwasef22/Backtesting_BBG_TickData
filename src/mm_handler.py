@@ -83,7 +83,11 @@ def create_mm_handler(config: dict = None):
             # 2) Handle opening auction: allow book updates and quoting, but skip trade processing
             is_opening_auction = strategy.is_in_opening_auction(timestamp)
             
-            # 3) Skip closing auction (14:45-15:00) except the flatten handled above
+            # 3) Skip silent period (10:00-10:05)
+            if strategy.is_in_silent_period(timestamp):
+                continue
+            
+            # 4) Skip closing auction (14:45-15:00) except the flatten handled above
             if strategy.is_in_closing_auction(timestamp):
                 continue
 
@@ -110,11 +114,11 @@ def create_mm_handler(config: dict = None):
             
             # ==== TRADING LOGIC ====
             
-            # 4. Get best bid/ask from orderbook
+            # 5. Get best bid/ask from orderbook
             best_bid = orderbook.get_best_bid()
             best_ask = orderbook.get_best_ask()
             
-            # 5. Check per-side refill and place quotes independently
+            # 6. Check per-side refill and place quotes independently
             quotes = strategy.generate_quotes(security, best_bid, best_ask)
             if quotes:
                 # Ensure containers exist
@@ -133,18 +137,18 @@ def create_mm_handler(config: dict = None):
                     bid_local = (bid_price * bid_ahead) if bid_price is not None else 0
                     bid_ok = bid_local >= threshold and bid_size > 0
 
-                    # Always update refill time, regardless of liquidity check result
-                    strategy.set_refill_time(security, 'bid', timestamp)
-
                     if bid_ok:
+                        # Quote passes liquidity check - place it and set refill time
+                        # This makes the quote "stick" for the refill interval
                         strategy.active_orders[security]['bid'] = {
                             'price': bid_price,
                             'ahead_qty': int(bid_ahead),
                             'our_remaining': int(bid_size)
                         }
                         strategy.quote_prices[security]['bid'] = bid_price
+                        strategy.set_refill_time(security, 'bid', timestamp)
                     else:
-                        # Suppress bid quote
+                        # Suppress bid quote - insufficient liquidity
                         strategy.active_orders[security]['bid'] = {
                             'price': bid_price,
                             'ahead_qty': int(bid_ahead),
@@ -160,18 +164,18 @@ def create_mm_handler(config: dict = None):
                     ask_local = (ask_price * ask_ahead) if ask_price is not None else 0
                     ask_ok = ask_local >= threshold and ask_size > 0
 
-                    # Always update refill time, regardless of liquidity check result
-                    strategy.set_refill_time(security, 'ask', timestamp)
-
                     if ask_ok:
+                        # Quote passes liquidity check - place it and set refill time
+                        # This makes the quote "stick" for the refill interval
                         strategy.active_orders[security]['ask'] = {
                             'price': ask_price,
                             'ahead_qty': int(ask_ahead),
                             'our_remaining': int(ask_size)
                         }
                         strategy.quote_prices[security]['ask'] = ask_price
+                        strategy.set_refill_time(security, 'ask', timestamp)
                     else:
-                        # Suppress ask quote
+                        # Suppress ask quote - insufficient liquidity
                         strategy.active_orders[security]['ask'] = {
                             'price': ask_price,
                             'ahead_qty': int(ask_ahead),

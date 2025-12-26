@@ -1,0 +1,7 @@
+ADNOCGAS Non-Trading Days Detailed Diagnostic
+================================================================================
+
+Total days: 0
+Trading days: 0
+Non-trading days: 0
+
