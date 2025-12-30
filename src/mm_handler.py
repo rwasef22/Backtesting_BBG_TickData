@@ -44,6 +44,7 @@ def create_mm_handler(config: dict = None):
             state['market_dates'] = set()  # Days with market trades
             state['strategy_dates'] = set()  # Days we executed trades
             state['last_date'] = None  # Track last processed date for orderbook reset
+            state['pending_flatten'] = None  # Track pending EOD position to flatten
         
         # Process each row in the chunk using itertuples for better performance
         # `preprocess_chunk_df` ensures columns are ['timestamp','type','price','volume']
@@ -69,16 +70,40 @@ def create_mm_handler(config: dict = None):
             
             if state.get('last_flatten_date') is not None and state['last_flatten_date'] != current_date:
                 state['closed_at_eod'] = False
+                state['pending_flatten'] = None  # Clear pending flatten on new day
 
-            # 1) Enforce daily flatten at/after 14:55; after flatten, skip further processing that row
+            # 1) EOD flatten at/after 14:55 - use trade price if available
             if strategy.is_eod_close_time(timestamp) and not state['closed_at_eod']:
                 if strategy.position[security] != 0:
-                    close_price = price if price is not None else state.get('last_price', price)
-                    strategy.flatten_position(security, close_price, timestamp)
-                state['closed_at_eod'] = True
-                state['last_flatten_date'] = current_date
-                state['trades'] = strategy.trades[security]
-                continue
+                    # If current event is a trade, use it immediately
+                    if event_type == 'trade':
+                        strategy.flatten_position(security, price, timestamp)
+                        state['trades'] = strategy.trades[security]
+                        state['closed_at_eod'] = True
+                        state['last_flatten_date'] = current_date
+                        continue
+                    else:
+                        # Not a trade, mark as pending flatten and wait
+                        state['pending_flatten'] = {
+                            'position': strategy.position[security],
+                            'entry_price': strategy.entry_price[security],
+                            'timestamp': timestamp
+                        }
+                        state['closed_at_eod'] = True
+                        state['last_flatten_date'] = current_date
+                        continue  # Skip this row, wait for trade
+                else:
+                    # No position to flatten
+                    state['closed_at_eod'] = True
+                    state['last_flatten_date'] = current_date
+            
+            # 2) Execute pending flatten when we see a trade
+            if state.get('pending_flatten') is not None:
+                if event_type == 'trade':
+                    strategy.flatten_position(security, price, timestamp)
+                    state['trades'] = strategy.trades[security]
+                    state['pending_flatten'] = None
+                continue  # Skip all events until we find the trade
 
             # 2) Handle opening auction: allow book updates and quoting, but skip trade processing
             is_opening_auction = strategy.is_in_opening_auction(timestamp)

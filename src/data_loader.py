@@ -26,7 +26,8 @@ def _normalize_row_values(row):
 
 
 def stream_sheets(file_path: str, header_row: int = 3, chunk_size: int = 100000,
-                  max_sheets: Optional[int] = None, only_trades: bool = False) -> Generator[Tuple[str, pd.DataFrame], None, None]:
+                  max_sheets: Optional[int] = None, only_trades: bool = False, 
+                  sheet_names_filter: Optional[list] = None) -> Generator[Tuple[str, pd.DataFrame], None, None]:
     """Stream each sheet in `file_path` and yield DataFrame chunks.
 
     Yields (sheet_name, chunk_df). chunk_df will have columns inferred from the header_row.
@@ -34,6 +35,7 @@ def stream_sheets(file_path: str, header_row: int = 3, chunk_size: int = 100000,
     - header_row is 1-based index of header line in Excel (defaults to 3 to match TickData format).
     - chunk_size controls how many rows are yielded per chunk.
     - only_trades: when True, filters rows where a 'Type' column equals 'TRADE' (case-insensitive).
+    - sheet_names_filter: optional list of specific sheet names to process (e.g., ['ADNOCGAS UH Equity'])
     """
     if not os.path.exists(file_path):
         raise FileNotFoundError(file_path)
@@ -42,7 +44,14 @@ def stream_sheets(file_path: str, header_row: int = 3, chunk_size: int = 100000,
     if _HAS_OPENPYXL:
         try:
             wb = load_workbook(filename=file_path, read_only=True, data_only=True)
-            sheet_names = wb.sheetnames[:max_sheets] if max_sheets else wb.sheetnames
+            
+            # Apply filtering logic
+            if sheet_names_filter:
+                sheet_names = [s for s in wb.sheetnames if s in sheet_names_filter]
+            elif max_sheets:
+                sheet_names = wb.sheetnames[:max_sheets]
+            else:
+                sheet_names = wb.sheetnames
 
             for sheet_name in sheet_names:
                 ws = wb[sheet_name]
@@ -97,7 +106,15 @@ def stream_sheets(file_path: str, header_row: int = 3, chunk_size: int = 100000,
 
     # Fallback: pandas full-sheet load then chunk
     xls = pd.ExcelFile(file_path)
-    sheets = xls.sheet_names[:max_sheets] if max_sheets else xls.sheet_names
+    
+    # Apply filtering logic
+    if sheet_names_filter:
+        sheets = [s for s in xls.sheet_names if s in sheet_names_filter]
+    elif max_sheets:
+        sheets = xls.sheet_names[:max_sheets]
+    else:
+        sheets = xls.sheet_names
+    
     for sheet in sheets:
         df_full = pd.read_excel(file_path, sheet_name=sheet, header=header_row - 1)
         if only_trades and 'Type' in df_full.columns:

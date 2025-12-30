@@ -355,7 +355,9 @@ class MarketMakingStrategy:
         
         # After a fill, reset refill time to start new cooldown period
         # This prevents requoting immediately after being filled
-        self.set_refill_time(security, side, timestamp)
+        # Map 'buy'/'sell' to 'bid'/'ask' for refill timer
+        refill_side = 'bid' if side == 'buy' else 'ask'
+        self.set_refill_time(security, refill_side, timestamp)
  
     
     def flatten_position(self, security: str, close_price: float, timestamp: datetime):

@@ -44,11 +44,14 @@ class MarketMakingBacktest:
     def run_streaming(self, file_path: str, header_row: int = 3, chunk_size: int = 100000,
                       only_trades: bool = True, max_sheets: Optional[int] = None,
                       handler: Optional[Callable[[str, Any, OrderBook, dict], dict]] = None,
-                      write_csv: bool = True, output_dir: Optional[str] = 'output') -> Dict[str, dict]:
+                      write_csv: bool = True, output_dir: Optional[str] = 'output',
+                      sheet_names_filter: Optional[list] = None) -> Dict[str, dict]:
         """Stream the Excel file and process each sheet chunk-by-chunk.
 
         - file_path: path to TickData.xlsx
         - only_trades: filter to trade events early if True (faster)
+        - max_sheets: limit to first N sheets
+        - sheet_names_filter: optional list of specific sheet names to process
         - handler: function(security, df, orderbook, state) -> state
         Returns a dict mapping security -> state summary
         """
@@ -56,7 +59,9 @@ class MarketMakingBacktest:
         handler = handler or self._default_handler
 
         chunk_count = 0
-        for sheet_name, chunk in stream_sheets(file_path, header_row=header_row, chunk_size=chunk_size, max_sheets=max_sheets, only_trades=only_trades):
+        for sheet_name, chunk in stream_sheets(file_path, header_row=header_row, chunk_size=chunk_size, 
+                                                max_sheets=max_sheets, only_trades=only_trades,
+                                                sheet_names_filter=sheet_names_filter):
             chunk_count += 1
             print(f"Processing chunk {chunk_count}: {len(chunk)} rows for {sheet_name}")
             

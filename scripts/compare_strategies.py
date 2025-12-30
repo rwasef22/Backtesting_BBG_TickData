@@ -4,13 +4,15 @@ This module provides utilities to compare performance metrics across
 different strategy variations and generate comparison reports.
 
 Usage:
-    python scripts/compare_strategies.py v1_baseline v2_aggressive_refill
+    python scripts/compare_strategies.py  # Compare v1 vs v2
+    python scripts/compare_strategies.py v1_baseline v2_price_follow_qty_cooldown
     python scripts/compare_strategies.py --all --output comparison_report.csv
 """
 import argparse
 import os
 import sys
 from typing import List, Dict
+from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -218,8 +220,9 @@ def main():
     elif args.strategies:
         strategies = args.strategies
     else:
-        parser.print_help()
-        sys.exit(1)
+        # Default: compare v1 vs v2
+        strategies = ['v1_baseline', 'v2_price_follow_qty_cooldown']
+        print("No strategies specified, comparing v1_baseline vs v2_price_follow_qty_cooldown")
     
     print(f"\n{'='*80}")
     print("STRATEGY COMPARISON")

@@ -335,7 +335,9 @@ class BaseMarketMakingStrategy(ABC):
         })
         
         # Reset refill timer after fill
-        self.set_refill_time(security, side, timestamp)
+        # Map 'buy'/'sell' to 'bid'/'ask' for refill timer
+        refill_side = 'bid' if side == 'buy' else 'ask'
+        self.set_refill_time(security, refill_side, timestamp)
     
     def flatten_position(self, security: str, close_price: float, timestamp: datetime):
         """Force close all positions at given price (EOD flatten).
@@ -354,6 +356,24 @@ class BaseMarketMakingStrategy(ABC):
         else:
             # Close short
             self._record_fill(security, 'buy', close_price, abs(self.position[security]), timestamp)
+    
+    def get_total_pnl(self, security: str, mark_price: Optional[float] = None) -> float:
+        """Get total P&L (realized + unrealized).
+        
+        Args:
+            security: Security identifier
+            mark_price: Current market price for unrealized P&L calculation
+            
+        Returns:
+            Total P&L (realized + unrealized)
+        """
+        realized = self.pnl[security]
+        unrealized = 0.0
+        
+        if mark_price is not None and self.position[security] != 0:
+            unrealized = (mark_price - self.entry_price[security]) * self.position[security]
+        
+        return realized + unrealized
     
     def get_strategy_name(self) -> str:
         """Return the strategy name/version identifier.
