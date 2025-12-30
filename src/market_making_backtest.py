@@ -95,6 +95,13 @@ class MarketMakingBacktest:
                     if 'timestamp' in df.columns:
                         df['timestamp'] = pd.to_datetime(df['timestamp'])
                         df = df.sort_values('timestamp').reset_index(drop=True)
+                    # Round PNL and position values to integers
+                    if 'realized_pnl' in df.columns:
+                        df['realized_pnl'] = df['realized_pnl'].round(0).astype(int)
+                    if 'pnl' in df.columns:
+                        df['pnl'] = df['pnl'].round(0).astype(int)
+                    if 'position' in df.columns:
+                        df['position'] = df['position'].round(0).astype(int)
                     # Standard per-security filename; downstream can select needed columns
                     file_name = f"{sec.lower()}_trades_timeseries.csv"
                     df.to_csv(out_dir / file_name, index=False)

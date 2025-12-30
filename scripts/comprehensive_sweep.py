@@ -790,10 +790,17 @@ def main():
                         if len(trades) > 0:
                             # Save trade-level data
                             trades_df = pd.DataFrame(trades)
+                            # Round PNL and position values to integers
+                            if 'realized_pnl' in trades_df.columns:
+                                trades_df['realized_pnl'] = trades_df['realized_pnl'].round(0).astype(int)
+                            if 'pnl' in trades_df.columns:
+                                trades_df['pnl'] = trades_df['pnl'].round(0).astype(int)
+                            if 'position' in trades_df.columns:
+                                trades_df['position'] = trades_df['position'].round(0).astype(int)
                             trades_path = interval_dir / f"{security}_trades.csv"
                             trades_df.to_csv(trades_path, index=False)
                             
-                            # Add to per-security summary
+                            # Add to per-security summary (keep exact values, round only in DataFrame)
                             per_security_rows.append({
                                 'security': security,
                                 'trades': len(trades),
@@ -804,6 +811,11 @@ def main():
                     
                     if per_security_rows:
                         summary_df = pd.DataFrame(per_security_rows)
+                        # Round only for output display
+                        if 'pnl' in summary_df.columns:
+                            summary_df['pnl'] = summary_df['pnl'].round(0).astype(int)
+                        if 'position' in summary_df.columns:
+                            summary_df['position'] = summary_df['position'].round(0).astype(int)
                         summary_path = interval_dir / 'per_security_summary.csv'
                         summary_df.to_csv(summary_path, index=False)
                         print(f"  ✓ Saved per-security results to {interval_dir.name}/")
