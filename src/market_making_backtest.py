@@ -41,8 +41,79 @@ class MarketMakingBacktest:
 
         return state
 
+    def run_streaming_from_generator(self, data_generator, 
+                                     handler: Optional[Callable[[str, Any, OrderBook, dict], dict]] = None,
+                                     write_csv: bool = True, output_dir: Optional[str] = 'output') -> Dict[str, dict]:
+        """Run streaming backtest from any data generator.
+        
+        This is a generic version that works with any generator yielding (sheet_name, chunk_df) tuples.
+        Can be used with stream_sheets (Excel) or stream_parquet_files (Parquet).
+        
+        Args:
+            data_generator: Generator yielding (sheet_name, chunk_df) tuples
+            handler: function(security, df, orderbook, state) -> state
+            write_csv: Write per-security CSVs
+            output_dir: Output directory for CSVs
+        
+        Returns:
+            Dict mapping security -> state summary
+        """
+        results: Dict[str, dict] = {}
+        handler = handler or self._default_handler
+
+        chunk_count = 0
+        for sheet_name, chunk in data_generator:
+            chunk_count += 1
+            print(f"Processing chunk {chunk_count}: {len(chunk)} rows for {sheet_name}")
+            
+            sec = sheet_name.replace(' UH Equity', '').replace(' DH Equity', '')
+            if sec not in self.order_books:
+                self.order_books[sec] = OrderBook()
+            ob = self.order_books[sec]
+            state = results.get(sec, {})
+
+            # normalize chunk
+            df = preprocess_chunk_df(chunk)
+
+            # call handler
+            state = handler(sec, df, ob, state) or state
+            results[sec] = state
+            
+            print(f"  After chunk {chunk_count}: {len(state.get('trades', []))} total trades")
+
+        print(f"\nTotal chunks processed: {chunk_count}")
+
+        # Optionally write per-security CSVs to avoid stale outputs
+        if write_csv:
+            out_dir = Path(output_dir or 'output')
+            out_dir.mkdir(parents=True, exist_ok=True)
+            for sec, state in results.items():
+                trades = state.get('trades', [])
+                if not trades:
+                    continue
+                try:
+                    df = pd.DataFrame(trades)
+                    if 'timestamp' in df.columns:
+                        df['timestamp'] = pd.to_datetime(df['timestamp'])
+                        df = df.sort_values('timestamp').reset_index(drop=True)
+                    # Round PNL and position values to integers
+                    if 'realized_pnl' in df.columns:
+                        df['realized_pnl'] = df['realized_pnl'].round(0).astype(int)
+                    if 'pnl' in df.columns:
+                        df['pnl'] = df['pnl'].round(0).astype(int)
+                    if 'position' in df.columns:
+                        df['position'] = df['position'].round(0).astype(int)
+                    # Standard per-security filename; downstream can select needed columns
+                    file_name = f"{sec.lower()}_trades_timeseries.csv"
+                    df.to_csv(out_dir / file_name, index=False)
+                except Exception:
+                    # Fail-safe: never break the backtest due to IO/format issues
+                    pass
+
+        return results
+
     def run_streaming(self, file_path: str, header_row: int = 3, chunk_size: int = 100000,
-                      only_trades: bool = True, max_sheets: Optional[int] = None,
+                      only_trades: bool = False, max_sheets: Optional[int] = None,
                       handler: Optional[Callable[[str, Any, OrderBook, dict], dict]] = None,
                       write_csv: bool = True, output_dir: Optional[str] = 'output',
                       sheet_names_filter: Optional[list] = None) -> Dict[str, dict]:

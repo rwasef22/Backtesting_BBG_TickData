@@ -27,6 +27,9 @@ from src.market_making_backtest import MarketMakingBacktest
 from src.config_loader import load_strategy_config
 from src.mm_handler import create_mm_handler
 from src.strategies.v2_price_follow_qty_cooldown.handler import create_v2_price_follow_qty_cooldown_handler
+from src.strategies.v2_1_stop_loss.handler import create_v2_1_stop_loss_handler
+from src.strategies.v3_liquidity_monitor.handler import create_v3_liquidity_monitor_handler
+from src.parquet_utils import ensure_parquet_data
 
 
 class AdvancedMetricsCalculator:
@@ -146,6 +149,11 @@ def create_config_with_interval(base_config: dict, interval_sec: int) -> dict:
         new_params['refill_interval_sec'] = interval_sec
         new_config[security] = new_params
     return new_config
+
+
+def format_strategy_name(strategy: str) -> str:
+    """Format strategy name for display (e.g., 'v2_1' -> 'V2.1')."""
+    return strategy.replace('_', '.').upper()
 
 
 def compute_per_security_metrics(results: dict, interval_sec: int, strategy: str) -> list:
@@ -319,13 +327,127 @@ def compute_comprehensive_metrics(results: dict, interval_sec: int, strategy: st
     }
 
 
+def compute_comprehensive_metrics_with_params(results: dict, param_value: float, strategy: str, param_name: str) -> dict:
+    """Compute comprehensive metrics with flexible parameter tracking.
+    
+    Args:
+        results: Backtest results dictionary
+        param_value: Parameter value used
+        strategy: Strategy name
+        param_name: Name of the parameter being swept
+        
+    Returns:
+        Dictionary with comprehensive metrics
+    """
+    # Use existing compute function
+    if param_name == 'interval_sec':
+        metrics = compute_comprehensive_metrics(results, int(param_value), strategy)
+    else:
+        metrics = compute_comprehensive_metrics(results, 60, strategy)  # Default interval for display
+        metrics[param_name] = param_value
+        # Keep interval_sec for backward compatibility
+        if param_name != 'interval_sec' and 'interval_sec' not in metrics:
+            metrics['interval_sec'] = 60
+    
+    return metrics
+
+
+def compute_per_security_metrics_with_params(results: dict, param_value: float, strategy: str, param_name: str) -> list:
+    """Compute per-security metrics with flexible parameter tracking.
+    
+    Args:
+        results: Backtest results dictionary
+        param_value: Parameter value used
+        strategy: Strategy name
+        param_name: Name of the parameter being swept
+        
+    Returns:
+        List of per-security metric dictionaries
+    """
+    if param_name == 'interval_sec':
+        metrics = compute_per_security_metrics(results, int(param_value), strategy)
+    else:
+        metrics = compute_per_security_metrics(results, 60, strategy)
+        for m in metrics:
+            m[param_name] = param_value
+    
+    return metrics
+
+
+def run_single_backtest_with_params(strategy: str, param_config: dict, base_config: dict,
+                                    data_path: str, max_sheets: int = None,
+                                    chunk_size: int = 100000, sheet_names_filter: list = None) -> dict:
+    """Run single backtest with flexible parameter configuration.
+    
+    Args:
+        strategy: 'v1', 'v2', 'v2_1', or 'v3'
+        param_config: Dictionary of parameters to set (e.g., {'refill_interval_sec': 60})
+        base_config: Base configuration
+        data_path: Path to data file
+        max_sheets: Max sheets to process
+        chunk_size: Chunk size
+        sheet_names_filter: List of sheet names to process (optional)
+        
+    Returns:
+        Backtest results dictionary
+    """
+    # Create config with custom parameters
+    config = {}
+    for security, sec_config in base_config.items():
+        config[security] = sec_config.copy()
+        config[security].update(param_config)
+    
+    # Create appropriate handler
+    if strategy == 'v1':
+        handler = create_mm_handler(config=config)
+    elif strategy == 'v2':
+        handler = create_v2_price_follow_qty_cooldown_handler(config=config)
+    elif strategy == 'v2_1':
+        handler = create_v2_1_stop_loss_handler(config=config)
+    elif strategy == 'v3':
+        handler = create_v3_liquidity_monitor_handler(config=config)
+    else:
+        raise ValueError(f"Unknown strategy: {strategy}")
+    
+    # Run backtest
+    start_time = time.time()
+    backtest = MarketMakingBacktest()
+    
+    try:
+        # Check if we should use Parquet (from main's data_path determination)
+        if data_path.endswith('.xlsx'):
+            # Excel format
+            results = backtest.run_streaming(
+                file_path=data_path,
+                handler=handler,
+                max_sheets=max_sheets,
+                chunk_size=chunk_size,
+                sheet_names_filter=sheet_names_filter
+            )
+        else:
+            # Parquet format  
+            results = backtest.run_parquet_streaming(
+                parquet_dir=data_path,
+                handler=handler,
+                max_files=max_sheets,
+                chunk_size=chunk_size
+            )
+        elapsed = time.time() - start_time
+        print(f"✓ Completed in {elapsed:.1f} seconds")
+        return results
+        
+    except Exception as e:
+        print(f"✗ Error: {e}")
+        return None
+
+
 def run_single_backtest(strategy: str, interval_sec: int, base_config: dict, 
                        data_path: str, max_sheets: int = None, 
                        chunk_size: int = 100000, sheet_names_filter: list = None) -> dict:
     """Run single backtest for given strategy and interval.
     
     Args:
-        strategy: 'v1' or 'v2'
+        strategy: 'v1', 'v2', 'v2_1', or 'v3'
         interval_sec: Refill interval
         base_config: Base configuration
         data_path: Path to data file
@@ -337,7 +459,7 @@ def run_single_backtest(strategy: str, interval_sec: int, base_config: dict,
         Backtest results dictionary
     """
     print(f"\n{'='*80}")
-    print(f"Testing {strategy.upper()} - Interval: {interval_sec}s ({interval_sec/60:.1f}m)")
+    print(f"Testing {format_strategy_name(strategy)} - Interval: {interval_sec}s ({interval_sec/60:.1f}m)")
     print(f"{'='*80}")
     
     # Create config
@@ -346,8 +468,14 @@ def run_single_backtest(strategy: str, interval_sec: int, base_config: dict,
     # Create appropriate handler
     if strategy == 'v1':
         handler = create_mm_handler(config=config)
-    else:
+    elif strategy == 'v2':
         handler = create_v2_price_follow_qty_cooldown_handler(config=config)
+    elif strategy == 'v2_1':
+        handler = create_v2_1_stop_loss_handler(config=config)
+    elif strategy == 'v3':
+        handler = create_v3_liquidity_monitor_handler(config=config)
+    else:
+        raise ValueError(f"Unknown strategy: {strategy}")
     
     # Run backtest
     start_time = time.time()
@@ -359,7 +487,6 @@ def run_single_backtest(strategy: str, interval_sec: int, base_config: dict,
             handler=handler,
             max_sheets=max_sheets,
             chunk_size=chunk_size,
-            only_trades=False,
             sheet_names_filter=sheet_names_filter
         )
         elapsed = time.time() - start_time
@@ -385,18 +512,25 @@ def load_checkpoint(checkpoint_path: Path) -> list:
     return []
 
 
-def plot_cumulative_pnl_by_strategy(all_results: dict, output_dir: Path):
+def plot_cumulative_pnl_by_strategy(all_results: dict, output_dir: Path, strategies: list = None):
     """Plot cumulative PnL over time for each strategy with different lines per interval.
     
     Args:
         all_results: Dictionary mapping (strategy, interval) -> results dict
         output_dir: Output directory
+        strategies: List of strategies to plot (default: all available)
     """
-    fig, axes = plt.subplots(1, 2, figsize=(18, 6))
+    if strategies is None:
+        strategies = sorted(set(strat for strat, _ in all_results.keys()))
+    
+    num_strategies = len(strategies)
+    fig, axes = plt.subplots(1, num_strategies, figsize=(6*num_strategies, 6))
+    if num_strategies == 1:
+        axes = [axes]
     
     colors = plt.cm.tab10(np.linspace(0, 1, 10))
     
-    for idx, strategy in enumerate(['v1', 'v2']):
+    for idx, strategy in enumerate(strategies):
         ax = axes[idx]
         
         color_idx = 0
@@ -427,7 +561,7 @@ def plot_cumulative_pnl_by_strategy(all_results: dict, output_dir: Path):
         
         ax.set_xlabel('Date', fontweight='bold', fontsize=12)
         ax.set_ylabel('Cumulative P&L (AED)', fontweight='bold', fontsize=12)
-        ax.set_title(f'{strategy.upper()} Strategy: Cumulative P&L Over Time', 
+        ax.set_title(f'{format_strategy_name(strategy)} Strategy: Cumulative P&L Over Time', 
                     fontweight='bold', fontsize=14)
         ax.legend(title='Refill Interval', fontsize=10)
         ax.grid(alpha=0.3)
@@ -480,7 +614,7 @@ def plot_pnl_by_security(all_results: dict, output_dir: Path):
         
         ax.set_xlabel('Date', fontweight='bold', fontsize=12)
         ax.set_ylabel('Cumulative P&L (AED)', fontweight='bold', fontsize=12)
-        ax.set_title(f'{strategy.upper()} @ {interval}s: Cumulative P&L by Security', 
+        ax.set_title(f'{format_strategy_name(strategy)} @ {interval}s: Cumulative P&L by Security', 
                     fontweight='bold', fontsize=14)
         ax.legend(loc='best', fontsize=9, ncol=2)
         ax.grid(alpha=0.3)
@@ -495,22 +629,49 @@ def plot_pnl_by_security(all_results: dict, output_dir: Path):
 
 
 def create_comparison_plots(all_metrics_df: pd.DataFrame, output_dir: Path):
-    """Create comprehensive comparison plots."""
+    """Create comprehensive comparison plots for all available strategies."""
+    
+    # Get all available strategies
+    strategies = sorted(all_metrics_df['strategy'].unique())
+    num_strategies = len(strategies)
+    
+    # Define colors for up to 6 strategies
+    strategy_colors = {
+        'v1': 'steelblue',
+        'v2': 'coral',
+        'v2_1': 'mediumorchid',
+        'v3': 'mediumseagreen',
+        'v4': 'gold',
+        'v5': 'mediumpurple'
+    }
+    
+    # Define markers for scatter plots
+    strategy_markers = {
+        'v1': 'o',
+        'v2': 's',
+        'v2_1': 'D',
+        'v3': '^',
+        'v4': 'P',
+        'v5': 'v'
+    }
     
     fig = plt.figure(figsize=(20, 16))
     gs = fig.add_gridspec(4, 3, hspace=0.3, wspace=0.3)
     
-    v1_data = all_metrics_df[all_metrics_df['strategy'] == 'v1']
-    v2_data = all_metrics_df[all_metrics_df['strategy'] == 'v2']
+    # Get strategy data
+    strategy_data = {s: all_metrics_df[all_metrics_df['strategy'] == s].sort_values('interval_sec') 
+                     for s in strategies}
     
     intervals = sorted(all_metrics_df['interval_sec'].unique())
     x = np.arange(len(intervals))
-    width = 0.35
+    width = 0.8 / num_strategies  # Adjust width based on number of strategies
     
     # 1. Total P&L
     ax1 = fig.add_subplot(gs[0, 0])
-    ax1.bar(x - width/2, v1_data['total_pnl'], width, label='V1', color='steelblue', alpha=0.8, edgecolor='black')
-    ax1.bar(x + width/2, v2_data['total_pnl'], width, label='V2', color='coral', alpha=0.8, edgecolor='black')
+    for i, strategy in enumerate(strategies):
+        offset = width * (i - (num_strategies - 1) / 2)
+        ax1.bar(x + offset, strategy_data[strategy]['total_pnl'], width, 
+               label=format_strategy_name(strategy), color=strategy_colors[strategy], alpha=0.8, edgecolor='black')
     ax1.set_xlabel('Interval (sec)', fontweight='bold')
     ax1.set_ylabel('P&L (AED)', fontweight='bold')
     ax1.set_title('Total P&L', fontweight='bold', fontsize=12)
@@ -522,8 +683,10 @@ def create_comparison_plots(all_metrics_df: pd.DataFrame, output_dir: Path):
     
     # 2. Total Trades
     ax2 = fig.add_subplot(gs[0, 1])
-    ax2.bar(x - width/2, v1_data['total_trades'], width, label='V1', color='steelblue', alpha=0.8, edgecolor='black')
-    ax2.bar(x + width/2, v2_data['total_trades'], width, label='V2', color='coral', alpha=0.8, edgecolor='black')
+    for i, strategy in enumerate(strategies):
+        offset = width * (i - (num_strategies - 1) / 2)
+        ax2.bar(x + offset, strategy_data[strategy]['total_trades'], width,
+               label=format_strategy_name(strategy), color=strategy_colors[strategy], alpha=0.8, edgecolor='black')
     ax2.set_xlabel('Interval (sec)', fontweight='bold')
     ax2.set_ylabel('Number of Trades', fontweight='bold')
     ax2.set_title('Total Trades', fontweight='bold', fontsize=12)
@@ -534,8 +697,10 @@ def create_comparison_plots(all_metrics_df: pd.DataFrame, output_dir: Path):
     
     # 3. Sharpe Ratio
     ax3 = fig.add_subplot(gs[0, 2])
-    ax3.bar(x - width/2, v1_data['sharpe_ratio'], width, label='V1', color='green', alpha=0.8, edgecolor='black')
-    ax3.bar(x + width/2, v2_data['sharpe_ratio'], width, label='V2', color='darkgreen', alpha=0.8, edgecolor='black')
+    for i, strategy in enumerate(strategies):
+        offset = width * (i - (num_strategies - 1) / 2)
+        ax3.bar(x + offset, strategy_data[strategy]['sharpe_ratio'], width,
+               label=format_strategy_name(strategy), color=strategy_colors[strategy], alpha=0.8, edgecolor='black')
     ax3.set_xlabel('Interval (sec)', fontweight='bold')
     ax3.set_ylabel('Sharpe Ratio', fontweight='bold')
     ax3.set_title('Sharpe Ratio (Annualized)', fontweight='bold', fontsize=12)
@@ -547,8 +712,10 @@ def create_comparison_plots(all_metrics_df: pd.DataFrame, output_dir: Path):
     
     # 4. Max Drawdown %
     ax4 = fig.add_subplot(gs[1, 0])
-    ax4.bar(x - width/2, v1_data['max_drawdown_pct'], width, label='V1', color='red', alpha=0.8, edgecolor='black')
-    ax4.bar(x + width/2, v2_data['max_drawdown_pct'], width, label='V2', color='darkred', alpha=0.8, edgecolor='black')
+    for i, strategy in enumerate(strategies):
+        offset = width * (i - (num_strategies - 1) / 2)
+        ax4.bar(x + offset, strategy_data[strategy]['max_drawdown_pct'], width,
+               label=format_strategy_name(strategy), color=strategy_colors[strategy], alpha=0.8, edgecolor='black')
     ax4.set_xlabel('Interval (sec)', fontweight='bold')
     ax4.set_ylabel('Drawdown (%)', fontweight='bold')
     ax4.set_title('Maximum Drawdown', fontweight='bold', fontsize=12)
@@ -559,8 +726,10 @@ def create_comparison_plots(all_metrics_df: pd.DataFrame, output_dir: Path):
     
     # 5. Avg P&L per Trade
     ax5 = fig.add_subplot(gs[1, 1])
-    ax5.bar(x - width/2, v1_data['avg_pnl_per_trade'], width, label='V1', color='steelblue', alpha=0.8, edgecolor='black')
-    ax5.bar(x + width/2, v2_data['avg_pnl_per_trade'], width, label='V2', color='coral', alpha=0.8, edgecolor='black')
+    for i, strategy in enumerate(strategies):
+        offset = width * (i - (num_strategies - 1) / 2)
+        ax5.bar(x + offset, strategy_data[strategy]['avg_pnl_per_trade'], width,
+               label=format_strategy_name(strategy), color=strategy_colors[strategy], alpha=0.8, edgecolor='black')
     ax5.set_xlabel('Interval (sec)', fontweight='bold')
     ax5.set_ylabel('Avg P&L (AED)', fontweight='bold')
     ax5.set_title('Avg P&L per Trade', fontweight='bold', fontsize=12)
@@ -572,8 +741,10 @@ def create_comparison_plots(all_metrics_df: pd.DataFrame, output_dir: Path):
     
     # 6. Win Rate
     ax6 = fig.add_subplot(gs[1, 2])
-    ax6.bar(x - width/2, v1_data['win_rate'], width, label='V1', color='green', alpha=0.8, edgecolor='black')
-    ax6.bar(x + width/2, v2_data['win_rate'], width, label='V2', color='darkgreen', alpha=0.8, edgecolor='black')
+    for i, strategy in enumerate(strategies):
+        offset = width * (i - (num_strategies - 1) / 2)
+        ax6.bar(x + offset, strategy_data[strategy]['win_rate'], width,
+               label=format_strategy_name(strategy), color=strategy_colors[strategy], alpha=0.8, edgecolor='black')
     ax6.set_xlabel('Interval (sec)', fontweight='bold')
     ax6.set_ylabel('Win Rate (%)', fontweight='bold')
     ax6.set_title('Win Rate', fontweight='bold', fontsize=12)
@@ -585,8 +756,10 @@ def create_comparison_plots(all_metrics_df: pd.DataFrame, output_dir: Path):
     
     # 7. Calmar Ratio
     ax7 = fig.add_subplot(gs[2, 0])
-    ax7.bar(x - width/2, v1_data['calmar_ratio'], width, label='V1', color='purple', alpha=0.8, edgecolor='black')
-    ax7.bar(x + width/2, v2_data['calmar_ratio'], width, label='V2', color='darkviolet', alpha=0.8, edgecolor='black')
+    for i, strategy in enumerate(strategies):
+        offset = width * (i - (num_strategies - 1) / 2)
+        ax7.bar(x + offset, strategy_data[strategy]['calmar_ratio'], width,
+               label=format_strategy_name(strategy), color=strategy_colors[strategy], alpha=0.8, edgecolor='black')
     ax7.set_xlabel('Interval (sec)', fontweight='bold')
     ax7.set_ylabel('Calmar Ratio', fontweight='bold')
     ax7.set_title('Calmar Ratio', fontweight='bold', fontsize=12)
@@ -597,8 +770,10 @@ def create_comparison_plots(all_metrics_df: pd.DataFrame, output_dir: Path):
     
     # 8. Profit Factor
     ax8 = fig.add_subplot(gs[2, 1])
-    ax8.bar(x - width/2, v1_data['profit_factor'], width, label='V1', color='orange', alpha=0.8, edgecolor='black')
-    ax8.bar(x + width/2, v2_data['profit_factor'], width, label='V2', color='darkorange', alpha=0.8, edgecolor='black')
+    for i, strategy in enumerate(strategies):
+        offset = width * (i - (num_strategies - 1) / 2)
+        ax8.bar(x + offset, strategy_data[strategy]['profit_factor'], width,
+               label=format_strategy_name(strategy), color=strategy_colors[strategy], alpha=0.8, edgecolor='black')
     ax8.set_xlabel('Interval (sec)', fontweight='bold')
     ax8.set_ylabel('Profit Factor', fontweight='bold')
     ax8.set_title('Profit Factor (Wins/Losses)', fontweight='bold', fontsize=12)
@@ -610,8 +785,10 @@ def create_comparison_plots(all_metrics_df: pd.DataFrame, output_dir: Path):
     
     # 9. Trades per Day
     ax9 = fig.add_subplot(gs[2, 2])
-    ax9.bar(x - width/2, v1_data['trades_per_day'], width, label='V1', color='steelblue', alpha=0.8, edgecolor='black')
-    ax9.bar(x + width/2, v2_data['trades_per_day'], width, label='V2', color='coral', alpha=0.8, edgecolor='black')
+    for i, strategy in enumerate(strategies):
+        offset = width * (i - (num_strategies - 1) / 2)
+        ax9.bar(x + offset, strategy_data[strategy]['trades_per_day'], width,
+               label=format_strategy_name(strategy), color=strategy_colors[strategy], alpha=0.8, edgecolor='black')
     ax9.set_xlabel('Interval (sec)', fontweight='bold')
     ax9.set_ylabel('Trades/Day', fontweight='bold')
     ax9.set_title('Trades per Day', fontweight='bold', fontsize=12)
@@ -622,21 +799,15 @@ def create_comparison_plots(all_metrics_df: pd.DataFrame, output_dir: Path):
     
     # 10. Risk-Return Scatter
     ax10 = fig.add_subplot(gs[3, 0])
-    # Plot V1 points with interval annotations
-    for i, (dd, pnl, interval) in enumerate(zip(v1_data['max_drawdown_pct'].abs(), 
-                                                  v1_data['total_pnl'], 
-                                                  v1_data['interval_sec'])):
-        ax10.scatter(dd, pnl, s=200, alpha=0.7, c='steelblue', edgecolor='black', 
-                    marker='o', label='V1' if i == 0 else '')
-        ax10.annotate(f'{int(interval)}s', (dd, pnl), fontsize=8, ha='center', va='bottom')
-    
-    # Plot V2 points with interval annotations
-    for i, (dd, pnl, interval) in enumerate(zip(v2_data['max_drawdown_pct'].abs(), 
-                                                  v2_data['total_pnl'], 
-                                                  v2_data['interval_sec'])):
-        ax10.scatter(dd, pnl, s=200, alpha=0.7, c='coral', edgecolor='black', 
-                    marker='s', label='V2' if i == 0 else '')
-        ax10.annotate(f'{int(interval)}s', (dd, pnl), fontsize=8, ha='center', va='top')
+    for strategy in strategies:
+        data = strategy_data[strategy]
+        for i, (dd, pnl, interval) in enumerate(zip(data['max_drawdown_pct'].abs(), 
+                                                      data['total_pnl'], 
+                                                      data['interval_sec'])):
+            ax10.scatter(dd, pnl, s=200, alpha=0.7, c=strategy_colors[strategy], edgecolor='black', 
+                        marker=strategy_markers[strategy], label=format_strategy_name(strategy) if i == 0 else '')
+            ax10.annotate(f'{int(interval)}s', (dd, pnl), fontsize=7, ha='center', 
+                         va='bottom' if strategy == strategies[0] else 'top')
     
     ax10.set_xlabel('Max Drawdown % (abs)', fontweight='bold')
     ax10.set_ylabel('Total P&L (AED)', fontweight='bold')
@@ -646,10 +817,11 @@ def create_comparison_plots(all_metrics_df: pd.DataFrame, output_dir: Path):
     
     # 11. Sharpe vs Interval Line Plot
     ax11 = fig.add_subplot(gs[3, 1])
-    ax11.plot(v1_data['interval_sec'], v1_data['sharpe_ratio'], 
-             marker='o', linewidth=2, markersize=8, label='V1', color='steelblue')
-    ax11.plot(v2_data['interval_sec'], v2_data['sharpe_ratio'], 
-             marker='s', linewidth=2, markersize=8, label='V2', color='coral')
+    for strategy in strategies:
+        data = strategy_data[strategy]
+        ax11.plot(data['interval_sec'], data['sharpe_ratio'], 
+                 marker=strategy_markers[strategy], linewidth=2, markersize=8, 
+                 label=format_strategy_name(strategy), color=strategy_colors[strategy])
     ax11.set_xlabel('Interval (sec)', fontweight='bold')
     ax11.set_ylabel('Sharpe Ratio', fontweight='bold')
     ax11.set_title('Sharpe Ratio Trend', fontweight='bold', fontsize=12)
@@ -659,10 +831,11 @@ def create_comparison_plots(all_metrics_df: pd.DataFrame, output_dir: Path):
     
     # 12. P&L vs Interval Line Plot
     ax12 = fig.add_subplot(gs[3, 2])
-    ax12.plot(v1_data['interval_sec'], v1_data['total_pnl'], 
-             marker='o', linewidth=2, markersize=8, label='V1', color='steelblue')
-    ax12.plot(v2_data['interval_sec'], v2_data['total_pnl'], 
-             marker='s', linewidth=2, markersize=8, label='V2', color='coral')
+    for strategy in strategies:
+        data = strategy_data[strategy]
+        ax12.plot(data['interval_sec'], data['total_pnl'], 
+                 marker=strategy_markers[strategy], linewidth=2, markersize=8,
+                 label=format_strategy_name(strategy), color=strategy_colors[strategy])
     ax12.set_xlabel('Interval (sec)', fontweight='bold')
     ax12.set_ylabel('Total P&L (AED)', fontweight='bold')
     ax12.set_title('P&L Trend', fontweight='bold', fontsize=12)
@@ -670,7 +843,9 @@ def create_comparison_plots(all_metrics_df: pd.DataFrame, output_dir: Path):
     ax12.grid(alpha=0.3)
     ax12.axhline(0, color='black', linestyle='--', linewidth=0.5)
     
-    fig.suptitle('V1 Baseline vs V2 Price Follow: Comprehensive Comparison', 
+    # Update title to reflect all strategies
+    title_strategies = ' vs '.join([format_strategy_name(s) for s in strategies])
+    fig.suptitle(f'{title_strategies}: Comprehensive Comparison', 
                  fontsize=18, fontweight='bold', y=0.995)
     
     plot_path = output_dir / 'comprehensive_comparison.png'
@@ -679,33 +854,193 @@ def create_comparison_plots(all_metrics_df: pd.DataFrame, output_dir: Path):
     plt.close()
 
 
+def regenerate_comprehensive_plots(output_dir: Path):
+    """Regenerate all comparison plots from the comprehensive_results.csv file.
+    
+    This function reads the saved CSV and regenerates:
+    1. Cumulative P&L by strategy plot
+    2. Comprehensive comparison plot (12-panel grid)
+    
+    Args:
+        output_dir: Output directory containing comprehensive_results.csv
+    """
+    csv_path = output_dir / 'comprehensive_results.csv'
+    
+    if not csv_path.exists():
+        print(f"  ⚠️  No comprehensive_results.csv found, skipping plot regeneration")
+        return
+    
+    # Load data
+    df = pd.read_csv(csv_path)
+    strategies = sorted(df['strategy'].unique())
+    
+    print(f"  [DATA] Loading data from {csv_path.name}")
+    print(f"  [INFO] Strategies found: {[format_strategy_name(s) for s in strategies]}")
+    print(f"  📝 Total rows: {len(df)}")
+    
+    # Strategy colors and markers
+    strategy_colors = {
+        'v1': 'steelblue',
+        'v2': 'coral',
+        'v2_1': 'mediumorchid',
+        'v3': 'mediumseagreen'
+    }
+    strategy_markers = {
+        'v1': 'o',
+        'v2': 's',
+        'v2_1': 'D',
+        'v3': '^'
+    }
+    
+    # 1. Regenerate cumulative P&L plot (simple version from CSV)
+    fig, ax = plt.subplots(figsize=(12, 7))
+    for strategy in strategies:
+        data = df[df['strategy'] == strategy].sort_values('interval_sec')
+        ax.plot(data['interval_sec'], data['total_pnl'],
+               marker=strategy_markers.get(strategy, 'o'), linewidth=2.5, markersize=10,
+               label=format_strategy_name(strategy), color=strategy_colors.get(strategy, 'gray'))
+    
+    ax.set_xlabel('Interval (sec)', fontweight='bold', fontsize=12)
+    ax.set_ylabel('Total P&L (AED)', fontweight='bold', fontsize=12)
+    ax.set_title('Cumulative P&L by Strategy', fontweight='bold', fontsize=14)
+    ax.legend(fontsize=11)
+    ax.grid(alpha=0.3)
+    ax.axhline(0, color='black', linestyle='--', linewidth=0.8)
+    
+    pnl_plot_path = output_dir / 'cumulative_pnl_by_strategy.png'
+    plt.savefig(pnl_plot_path, dpi=150, bbox_inches='tight')
+    print(f"  [OK] Regenerated: {pnl_plot_path.name}")
+    plt.close()
+    
+    # 2. Regenerate comprehensive comparison plot
+    create_comparison_plots(df, output_dir)
+    print(f"  [OK] Regenerated: comprehensive_comparison.png")
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Comprehensive V1 vs V2 parameter sweep")
+    parser = argparse.ArgumentParser(
+        description="Comprehensive parameter sweep with multiple strategies",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Fresh V2 vs V2.1 sweep with custom intervals
+  python scripts/comprehensive_sweep.py --strategies v2 v2_1 --fresh --intervals 30 60 120
+  
+  # Continue from checkpoint, add V3 to existing results
+  python scripts/comprehensive_sweep.py --strategies v3 --continue
+  
+  # Sweep cooldown parameter (30-600s) for V2
+  python scripts/comprehensive_sweep.py --strategies v2 --sweep-param cooldown --param-range 30 600 30
+  
+  # Sweep stop-loss threshold (1-10%) for V2.1
+  python scripts/comprehensive_sweep.py --strategies v2_1 --sweep-param threshold --param-range 1 10 1
+        """)
+    
+    # Basic config
     parser.add_argument('--v1-config', type=str, default='configs/v1_baseline_config.json')
     parser.add_argument('--v2-config', type=str, default='configs/v2_price_follow_qty_cooldown_config.json')
+    parser.add_argument('--v3-config', type=str, default='configs/v3_liquidity_monitor_config.json')
     parser.add_argument('--data', type=str, default='data/raw/TickData.xlsx')
-    parser.add_argument('--intervals', type=int, nargs='+', default=[30, 60, 120, 180, 300])
     parser.add_argument('--max-sheets', type=int, default=None)
     parser.add_argument('--sheet-names', type=str, nargs='+', default=None,
                        help='Specific sheet names to process (e.g., "ADNOCGAS UH Equity")')
     parser.add_argument('--chunk-size', type=int, default=100000)
     parser.add_argument('--output-dir', type=str, default='output/comprehensive_sweep')
-    parser.add_argument('--strategies', type=str, nargs='+', default=['v1', 'v2'], choices=['v1', 'v2'])
-    parser.add_argument('--fresh', action='store_true', 
-                       help='Start fresh sweep, ignoring any existing checkpoint')
+    
+    # Strategy selection
+    parser.add_argument('--strategies', type=str, nargs='+', default=['v1', 'v2'], 
+                       choices=['v1', 'v2', 'v2_1', 'v3'],
+                       help='Strategies to test: v1, v2, v2_1, v3 (default: v1 v2)')
+    
+    # Parameter sweep configuration
+    parser.add_argument('--sweep-param', type=str, default='interval',
+                       choices=['interval', 'cooldown', 'threshold'],
+                       help='Parameter to sweep: interval (refill_interval_sec), cooldown (min_cooldown_sec), threshold (stop_loss_threshold_pct)')
+    parser.add_argument('--intervals', type=int, nargs='+', default=None,
+                       help='Intervals to test (default: 30 60 120 180 300). Only used if --sweep-param=interval')
+    parser.add_argument('--param-range', type=float, nargs=3, default=None,
+                       metavar=('START', 'END', 'STEP'),
+                       help='Parameter range: start end step (e.g., --param-range 30 600 30 for cooldown)')
+    
+    # Execution mode
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument('--fresh', action='store_true', 
+                           help='Start fresh sweep, delete existing checkpoint and results')
+    mode_group.add_argument('--continue', dest='continue_mode', action='store_true',
+                           help='Continue from checkpoint, only run incomplete configurations (default)')
+    parser.add_argument('--skip-existing', action='store_true',
+                       help='Skip strategies that already have results in checkpoint (useful for adding new strategies)')
     
     args = parser.parse_args()
     
+    # Ensure Parquet data exists (auto-convert if needed)
+    print("\nChecking data format...")
+    try:
+        parquet_dir = ensure_parquet_data(
+            excel_path=args.data,
+            parquet_dir='data/parquet',
+            max_sheets=args.max_sheets
+        )
+        use_parquet = True
+        data_path = parquet_dir
+        print(f"Using Parquet format: {parquet_dir}\n")
+    except Exception as e:
+        print(f"Parquet setup failed: {e}")
+        print(f"Falling back to Excel format: {args.data}\n")
+        use_parquet = False
+        data_path = args.data
+    
+    # Determine parameter sweep configuration
+    if args.sweep_param == 'interval':
+        if args.intervals is None:
+            sweep_values = [30, 60, 120, 180, 300]
+        else:
+            sweep_values = args.intervals
+        param_name = 'interval_sec'
+        param_display = 'Interval (sec)'
+    elif args.sweep_param == 'cooldown':
+        if args.param_range is None:
+            print("ERROR: --param-range required when sweeping cooldown")
+            print("Example: --param-range 30 600 30")
+            sys.exit(1)
+        start, end, step = args.param_range
+        sweep_values = list(range(int(start), int(end) + 1, int(step)))
+        param_name = 'min_cooldown_sec'
+        param_display = 'Cooldown (sec)'
+    elif args.sweep_param == 'threshold':
+        if args.param_range is None:
+            print("ERROR: --param-range required when sweeping threshold")
+            print("Example: --param-range 1 10 1")
+            sys.exit(1)
+        start, end, step = args.param_range
+        sweep_values = [round(x, 2) for x in np.arange(start, end + step, step)]
+        param_name = 'stop_loss_threshold_pct'
+        param_display = 'Stop Loss Threshold (%)'
+    
     print(f"\n{'='*80}")
-    print("COMPREHENSIVE PARAMETER SWEEP: V1 vs V2")
+    print(f"COMPREHENSIVE PARAMETER SWEEP")
     print(f"{'='*80}")
-    print(f"Strategies: {', '.join([s.upper() for s in args.strategies])}")
-    print(f"Intervals: {args.intervals}")
+    print(f"Strategies: {', '.join([format_strategy_name(s) for s in args.strategies])}")
+    if 'v3' in args.strategies:
+        print(f"WARNING: V3 was abandoned due to poor performance")
+        print(f"         See output/v3_abandoned/V3_ABANDONMENT_REPORT.md")
+    print(f"Sweep Parameter: {param_display}")
+    print(f"Values: {sweep_values}")
     print(f"Data: {args.data}")
     print(f"Max Sheets: {args.max_sheets or 'All'}")
     print(f"Sheet Filter: {args.sheet_names if args.sheet_names else 'None'}")
     print(f"Output: {args.output_dir}")
-    print(f"Mode: {'Fresh start (ignoring checkpoint)' if args.fresh else 'Resume from checkpoint'}")
+    
+    # Determine execution mode
+    if args.fresh:
+        mode_str = "Fresh start (deleting checkpoint)"
+    elif args.continue_mode:
+        mode_str = "Continue from checkpoint"
+    elif args.skip_existing:
+        mode_str = f"Skip existing strategies, run only incomplete"
+    else:
+        mode_str = "Continue from checkpoint (default)"
+    print(f"Execution Mode: {mode_str}")
     print(f"{'='*80}\n")
     
     # Create output directory
@@ -717,10 +1052,43 @@ def main():
     
     # Load existing progress or start fresh
     if args.fresh:
-        print("Starting fresh sweep (checkpoint ignored)\n")
+        print("[FRESH] Starting new sweep")
+        if checkpoint_path.exists():
+            print(f"   Deleting checkpoint: {checkpoint_path}")
+            checkpoint_path.unlink()
+        # Delete old per-interval folders
+        for folder in output_dir.glob('*_*s'):
+            if folder.is_dir():
+                print(f"   Deleting old results: {folder.name}")
+                import shutil
+                shutil.rmtree(folder)
+        print("   All previous results cleared\n")
         all_metrics = []
         completed = set()
+    elif args.skip_existing or args.continue_mode:
+        all_metrics = load_checkpoint(checkpoint_path)
+        if args.skip_existing:
+            # Only skip strategies that already have results
+            existing_strategies = set(m['strategy'] for m in all_metrics)
+            skip_strategies = [s for s in args.strategies if s in existing_strategies]
+            completed = {(m['strategy'], m.get(param_name, m.get('interval_sec'))) for m in all_metrics if m['strategy'] in skip_strategies}
+            print(f"[DATA] Loaded {len(all_metrics)} existing results")
+            print(f"   Skipping existing strategies: {skip_strategies}")
+            print(f"   Will run: {[s for s in args.strategies if s not in skip_strategies]}")
+            print(f"   {len(completed)} configurations marked as completed\n")
+        else:
+            # Continue mode: skip any matching (strategy, param) combination
+            completed = {(m['strategy'], m.get(param_name, m.get('interval_sec'))) for m in all_metrics}
+            print(f"▶️  Continuing from checkpoint")
+            print(f"   Loaded {len(all_metrics)} existing results")
+            print(f"   {len(completed)} configurations already completed\n")
     else:
+        # Default: continue from checkpoint
+        all_metrics = load_checkpoint(checkpoint_path)
+        completed = {(m['strategy'], m.get(param_name, m.get('interval_sec'))) for m in all_metrics}
+        print(f"▶️  Continuing from checkpoint (default)")
+        print(f"   Loaded {len(all_metrics)} existing results")
+        print(f"   {len(completed)} configurations already completed\n")
         all_metrics = load_checkpoint(checkpoint_path)
         completed = {(m['strategy'], m['interval_sec']) for m in all_metrics}
         print(f"Found {len(completed)} completed runs from checkpoint\n")
@@ -730,13 +1098,22 @@ def main():
     if 'v1' in args.strategies:
         configs['v1'] = load_strategy_config(args.v1_config)
         print(f"Loaded V1 config: {len(configs['v1'])} securities")
-    if 'v2' in args.strategies:
-        configs['v2'] = load_strategy_config(args.v2_config)
-        print(f"Loaded V2 config: {len(configs['v2'])} securities")
+    if 'v2' in args.strategies or 'v2_1' in args.strategies:
+        v2_config = load_strategy_config(args.v2_config)
+        if 'v2' in args.strategies:
+            configs['v2'] = v2_config
+            print(f"Loaded V2 config: {len(configs['v2'])} securities")
+        if 'v2_1' in args.strategies:
+            configs['v2_1'] = v2_config
+            print(f"Loaded V2.1 config: {len(configs['v2_1'])} securities")
+    if 'v3' in args.strategies:
+        configs['v3'] = load_strategy_config(args.v3_config)
+        print(f"Loaded V3 config: {len(configs['v3'])} securities")
     
     # Run sweeps
-    total_runs = len(args.strategies) * len(args.intervals)
-    current_run = len(completed)
+    total_runs = len(args.strategies) * len(sweep_values)
+    skipped = len(completed)
+    current_run = 0
     
     # Storage for per-security metrics across all runs
     all_per_security_metrics = []
@@ -745,22 +1122,30 @@ def main():
     all_results = {}
     
     for strategy in args.strategies:
-        for interval_sec in args.intervals:
+        for param_value in sweep_values:
             # Skip if already completed
-            if (strategy, interval_sec) in completed:
-                print(f"\n[{current_run + 1}/{total_runs}] Skipping {strategy.upper()} {interval_sec}s (already completed)")
+            if (strategy, param_value) in completed:
+                print(f"⏭️  [{current_run + skipped + 1}/{total_runs}] Skipping {format_strategy_name(strategy)} {param_name}={param_value} (already completed)")
                 continue
             
             current_run += 1
             print(f"\n{'='*80}")
-            print(f"[{current_run}/{total_runs}] Running {strategy.upper()} - {interval_sec}s")
+            print(f"[RUN] [{current_run}/{total_runs - skipped}] Running {format_strategy_name(strategy)} - {param_display}={param_value}")
             print(f"{'='*80}")
             
             try:
+                # Create config with parameter
+                if args.sweep_param == 'interval':
+                    param_config = {'refill_interval_sec': param_value}
+                elif args.sweep_param == 'cooldown':
+                    param_config = {'min_cooldown_sec': param_value, 'refill_interval_sec': 60}  # Default interval
+                elif args.sweep_param == 'threshold':
+                    param_config = {'stop_loss_threshold_pct': param_value, 'refill_interval_sec': 60}  # Default interval
+                
                 # Run backtest
-                results = run_single_backtest(
+                results = run_single_backtest_with_params(
                     strategy=strategy,
-                    interval_sec=interval_sec,
+                    param_config=param_config,
                     base_config=configs[strategy],
                     data_path=args.data,
                     max_sheets=args.max_sheets,
@@ -770,19 +1155,26 @@ def main():
                 
                 if results is not None:
                     # Store results for plotting
-                    all_results[(strategy, interval_sec)] = results
+                    all_results[(strategy, param_value)] = results
                     
-                    # Compute aggregate metrics
-                    metrics = compute_comprehensive_metrics(results, interval_sec, strategy)
+                    # Compute aggregate metrics with parameter tracking
+                    metrics = compute_comprehensive_metrics_with_params(
+                        results, param_value, strategy, param_name
+                    )
                     all_metrics.append(metrics)
                     
                     # Compute per-security metrics
-                    per_sec_metrics = compute_per_security_metrics(results, interval_sec, strategy)
+                    per_sec_metrics = compute_per_security_metrics_with_params(
+                        results, param_value, strategy, param_name
+                    )
                     all_per_security_metrics.extend(per_sec_metrics)
                     
                     # Save per-security results
-                    interval_dir = output_dir / f"{strategy}_{interval_sec}s"
-                    interval_dir.mkdir(parents=True, exist_ok=True)
+                    if args.sweep_param == 'interval':
+                        param_dir = output_dir / f"{strategy}_{param_value}s"
+                    else:
+                        param_dir = output_dir / f"{strategy}_{args.sweep_param}_{param_value}"
+                    param_dir.mkdir(parents=True, exist_ok=True)
                     
                     per_security_rows = []
                     for security, data in results.items():
@@ -797,7 +1189,7 @@ def main():
                                 trades_df['pnl'] = trades_df['pnl'].round(0).astype(int)
                             if 'position' in trades_df.columns:
                                 trades_df['position'] = trades_df['position'].round(0).astype(int)
-                            trades_path = interval_dir / f"{security}_trades.csv"
+                            trades_path = param_dir / f"{security}_trades.csv"
                             trades_df.to_csv(trades_path, index=False)
                             
                             # Add to per-security summary (keep exact values, round only in DataFrame)
@@ -816,15 +1208,15 @@ def main():
                             summary_df['pnl'] = summary_df['pnl'].round(0).astype(int)
                         if 'position' in summary_df.columns:
                             summary_df['position'] = summary_df['position'].round(0).astype(int)
-                        summary_path = interval_dir / 'per_security_summary.csv'
+                        summary_path = param_dir / 'per_security_summary.csv'
                         summary_df.to_csv(summary_path, index=False)
-                        print(f"  ✓ Saved per-security results to {interval_dir.name}/")
+                        print(f"  ✓ Saved per-security results to {param_dir.name}/")
                     
                     # Save checkpoint
                     save_checkpoint(all_metrics, checkpoint_path)
                     
                     # Print summary
-                    print(f"\n{strategy.upper()} @ {interval_sec}s Summary:")
+                    print(f"\n{format_strategy_name(strategy)} @ {param_display}={param_value} Summary:")
                     print(f"  Trades: {metrics['total_trades']:,}")
                     print(f"  P&L: {metrics['total_pnl']:,.2f} AED")
                     print(f"  Sharpe: {metrics['sharpe_ratio']:.3f}")
@@ -833,10 +1225,10 @@ def main():
                     print(f"  Loss Rate: {metrics['loss_rate']:.1f}%")
                 
             except KeyboardInterrupt:
-                print("\n\nInterrupted by user. Progress saved to checkpoint.")
+                print("\n\n⚠️  Interrupted by user. Progress saved to checkpoint.")
                 sys.exit(0)
             except Exception as e:
-                print(f"\n✗ Error in {strategy} @ {interval_sec}s: {e}")
+                print(f"\n[ERROR] Error in {strategy} @ {param_display}={param_value}: {e}")
                 import traceback
                 traceback.print_exc()
     
@@ -871,44 +1263,40 @@ def main():
         pivot_pnl.to_csv(pivot_path)
         print(f"✓ Saved per-security P&L pivot: {pivot_path}")
     
-    # Create comparison table
-    if 'v1' in args.strategies and 'v2' in args.strategies:
-        v1_df = metrics_df[metrics_df['strategy'] == 'v1'].sort_values('interval_sec')
-        v2_df = metrics_df[metrics_df['strategy'] == 'v2'].sort_values('interval_sec')
+    # Create comparison table (adapt to available strategies)
+    available_strategies = sorted(metrics_df['strategy'].unique())
+    
+    if len(available_strategies) >= 2:
+        # Create comparison for available strategies
+        intervals = sorted(metrics_df['interval_sec'].unique())
+        comparison_data = {'Interval (sec)': intervals}
         
-        comparison = pd.DataFrame({
-            'Interval (sec)': v1_df['interval_sec'].values,
+        for strategy in available_strategies:
+            strat_df = metrics_df[metrics_df['strategy'] == strategy].sort_values('interval_sec')
             
-            # P&L
-            'V1 P&L': v1_df['total_pnl'].values,
-            'V2 P&L': v2_df['total_pnl'].values,
-            'P&L Diff': (v2_df['total_pnl'].values - v1_df['total_pnl'].values),
+            # Create a complete series aligned with all intervals
+            pnl_series = pd.Series(index=intervals, dtype=float)
+            trades_series = pd.Series(index=intervals, dtype=int)
+            sharpe_series = pd.Series(index=intervals, dtype=float)
+            dd_series = pd.Series(index=intervals, dtype=float)
+            win_series = pd.Series(index=intervals, dtype=float)
             
-            # Trades
-            'V1 Trades': v1_df['total_trades'].values,
-            'V2 Trades': v2_df['total_trades'].values,
+            # Fill in available data
+            for _, row in strat_df.iterrows():
+                interval = row['interval_sec']
+                pnl_series[interval] = row['total_pnl']
+                trades_series[interval] = row['total_trades']
+                sharpe_series[interval] = row['sharpe_ratio']
+                dd_series[interval] = row['max_drawdown_pct']
+                win_series[interval] = row['win_rate']
             
-            # Sharpe
-            'V1 Sharpe': v1_df['sharpe_ratio'].values,
-            'V2 Sharpe': v2_df['sharpe_ratio'].values,
-            
-            # Drawdown
-            'V1 Max DD%': v1_df['max_drawdown_pct'].values,
-            'V2 Max DD%': v2_df['max_drawdown_pct'].values,
-            
-            # Win Rate
-            'V1 Win%': v1_df['win_rate'].values,
-            'V2 Win%': v2_df['win_rate'].values,
-            
-            # Loss Rate
-            'V1 Loss%': v1_df['loss_rate'].values,
-            'V2 Loss%': v2_df['loss_rate'].values,
-            
-            # Calmar
-            'V1 Calmar': v1_df['calmar_ratio'].values,
-            'V2 Calmar': v2_df['calmar_ratio'].values,
-        })
+            comparison_data[f'{format_strategy_name(strategy)} P&L'] = pnl_series.values
+            comparison_data[f'{format_strategy_name(strategy)} Trades'] = trades_series.values
+            comparison_data[f'{format_strategy_name(strategy)} Sharpe'] = sharpe_series.values
+            comparison_data[f'{format_strategy_name(strategy)} Max DD%'] = dd_series.values
+            comparison_data[f'{format_strategy_name(strategy)} Win%'] = win_series.values
         
+        comparison = pd.DataFrame(comparison_data)
         comparison_path = output_dir / 'comparison_table.csv'
         comparison.to_csv(comparison_path, index=False)
         print(f"✓ Saved comparison table: {comparison_path}")
@@ -920,14 +1308,19 @@ def main():
         print(comparison.to_string(index=False))
         print(f"{'='*120}\n")
         
-        # Create plots
+        # Create comparison plots for all available strategies
         create_comparison_plots(metrics_df, output_dir)
     
-    # Create cumulative P&L plots
+    # Generate all plots (cumulative P&L + comprehensive comparison)
     if all_results:
-        print(f"\nGenerating cumulative P&L plots...")
-        plot_cumulative_pnl_by_strategy(all_results, output_dir)
+        print(f"\n[PLOTS] Generating cumulative P&L plots...")
+        available_strategies = sorted(set(strat for strat, _ in all_results.keys()))
+        plot_cumulative_pnl_by_strategy(all_results, output_dir, strategies=available_strategies)
         plot_pnl_by_security(all_results, output_dir)
+    
+    # Regenerate comprehensive comparison plot with ALL data from CSV
+    print(f"\n[PLOT] Regenerating comprehensive comparison plot with all data...")
+    regenerate_comprehensive_plots(output_dir)
     
     # Find best configurations
     print(f"\n{'='*80}")
@@ -937,25 +1330,31 @@ def main():
     for strategy in args.strategies:
         strat_df = metrics_df[metrics_df['strategy'] == strategy]
         
+        if len(strat_df) == 0:
+            continue
+        
         best_pnl = strat_df.loc[strat_df['total_pnl'].idxmax()]
         best_sharpe = strat_df.loc[strat_df['sharpe_ratio'].idxmax()]
         
-        print(f"{strategy.upper()} Best by P&L:")
-        print(f"  Interval: {best_pnl['interval_sec']:.0f}s ({best_pnl['interval_min']:.1f}m)")
+        param_value_pnl = best_pnl.get(param_name, best_pnl.get('interval_sec', 'N/A'))
+        param_value_sharpe = best_sharpe.get(param_name, best_sharpe.get('interval_sec', 'N/A'))
+        
+        print(f"{format_strategy_name(strategy)} Best by P&L:")
+        print(f"  {param_display}: {param_value_pnl}")
         print(f"  P&L: {best_pnl['total_pnl']:,.2f} AED")
         print(f"  Sharpe: {best_pnl['sharpe_ratio']:.3f}")
         print(f"  Max DD: {best_pnl['max_drawdown_pct']:.2f}%")
         print(f"  Win Rate: {best_pnl['win_rate']:.1f}%\n")
         
-        print(f"{strategy.upper()} Best by Sharpe:")
-        print(f"  Interval: {best_sharpe['interval_sec']:.0f}s ({best_sharpe['interval_min']:.1f}m)")
+        print(f"{format_strategy_name(strategy)} Best by Sharpe:")
+        print(f"  {param_display}: {param_value_sharpe}")
         print(f"  P&L: {best_sharpe['total_pnl']:,.2f} AED")
         print(f"  Sharpe: {best_sharpe['sharpe_ratio']:.3f}")
         print(f"  Max DD: {best_sharpe['max_drawdown_pct']:.2f}%")
         print(f"  Win Rate: {best_sharpe['win_rate']:.1f}%\n")
     
     print(f"{'='*80}")
-    print("SWEEP COMPLETE!")
+    print("[COMPLETE] SWEEP COMPLETE!")
     print(f"Results saved to: {output_dir}")
     print(f"{'='*80}\n")
 

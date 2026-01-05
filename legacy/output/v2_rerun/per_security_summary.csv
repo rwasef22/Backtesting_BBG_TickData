@@ -1,0 +1,2 @@
+strategy,interval_sec,security,trades,pnl,volume,position,avg_pnl_per_trade,sharpe_ratio,max_drawdown,max_drawdown_pct,calmar_ratio,win_rate,profit_factor,trading_days,trades_per_day
+v2,30,EMAAR,22408,555789.3000000019,1556452101.0,0,24.803164048554173,8.702736380171608,-13822.450000000157,-26.00962298376514,3959476.383239327,23.995894323455907,1.9809763229433612,136,164.76470588235293

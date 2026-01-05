@@ -1,0 +1,134 @@
+﻿Loading data...
+Loaded 100,000 rows
+
+================================================================================
+PROCESSING EVENTS (10:17:36 - 10:17:38)
+================================================================================
+
+[2025-04-14 10:17:37] Market Event: TRADE @ 12.250 vol=18000
+
+>>> Quotes generated at 2025-04-14 10:17:37:
+    Position: 40101
+    BID: 12.2 x 0
+    ASK: 12.25 x 50000
+
+[2025-04-14 10:17:37] Market Event: TRADE @ 12.250 vol=13338
+
+>>> Quotes generated at 2025-04-14 10:17:37:
+    Position: 40101
+    BID: 12.2 x 0
+    ASK: 12.25 x 50000
+
+>>> _record_fill called:
+    Time: 2025-04-14 10:17:37
+    Side: sell, Qty: 13338, Price: 12.25
+    Position before: 40101
+    Position after: 26763
+    Total trades: 4
+
+[2025-04-14 10:17:37] Market Event: TRADE @ 12.250 vol=11602
+
+>>> Quotes generated at 2025-04-14 10:17:37:
+    Position: 26763
+    BID: 12.2 x 0
+    ASK: 12.25 x 36662
+
+>>> _record_fill called:
+    Time: 2025-04-14 10:17:37
+    Side: sell, Qty: 11602, Price: 12.25
+    Position before: 26763
+    Position after: 15161
+    Total trades: 5
+
+[2025-04-14 10:17:37] Market Event: TRADE @ 12.250 vol=152
+
+>>> Quotes generated at 2025-04-14 10:17:37:
+    Position: 15161
+    BID: 12.2 x 0
+    ASK: 12.25 x 25060
+
+>>> _record_fill called:
+    Time: 2025-04-14 10:17:37
+    Side: sell, Qty: 152, Price: 12.25
+    Position before: 15161
+    Position after: 15009
+    Total trades: 6
+
+[2025-04-14 10:17:37] Market Event: TRADE @ 12.250 vol=5983
+
+>>> Quotes generated at 2025-04-14 10:17:37:
+    Position: 15009
+    BID: 12.2 x 0
+    ASK: 12.25 x 24908
+
+>>> _record_fill called:
+    Time: 2025-04-14 10:17:37
+    Side: sell, Qty: 5983, Price: 12.25
+    Position before: 15009
+    Position after: 9026
+    Total trades: 7
+
+[2025-04-14 10:17:37] Market Event: BID   @ 12.250 vol=925
+
+>>> Quotes generated at 2025-04-14 10:17:37:
+    Position: 9026
+    BID: 12.25 x 0
+    ASK: 12.25 x 18925
+
+[2025-04-14 10:17:37] Market Event: ASK   @ 12.300 vol=199829
+
+>>> Quotes generated at 2025-04-14 10:17:37:
+    Position: 9026
+    BID: 12.25 x 0
+    ASK: 12.3 x 18925
+
+[2025-04-14 10:17:37] Market Event: TRADE @ 12.250 vol=925
+
+>>> Quotes generated at 2025-04-14 10:17:37:
+    Position: 9026
+    BID: 12.25 x 0
+    ASK: 12.3 x 18925
+
+[2025-04-14 10:17:37] Market Event: BID   @ 12.200 vol=245225
+
+>>> Quotes generated at 2025-04-14 10:17:37:
+    Position: 9026
+    BID: 12.2 x 0
+    ASK: 12.3 x 18925
+
+[2025-04-14 10:17:37] Market Event: ASK   @ 12.300 vol=199829
+
+>>> Quotes generated at 2025-04-14 10:17:37:
+    Position: 9026
+    BID: 12.2 x 0
+    ASK: 12.3 x 18925
+
+[2025-04-14 10:17:38] Market Event: ASK   @ 12.300 vol=199829
+
+>>> Quotes generated at 2025-04-14 10:17:38:
+    Position: 9026
+    BID: 12.2 x 0
+    ASK: 12.3 x 18925
+
+[2025-04-14 10:17:38] Market Event: ASK   @ 12.300 vol=199829
+
+>>> Quotes generated at 2025-04-14 10:17:38:
+    Position: 9026
+    BID: 12.2 x 0
+    ASK: 12.3 x 18925
+
+================================================================================
+Stopping after 8 trades
+================================================================================
+
+================================================================================
+TRADES RECORDED:
+================================================================================
+ 1. 2025-04-14 10:12:36 sell   3739 @ 12.250 -> pos= -3739
+ 2. 2025-04-14 10:12:36 sell   6160 @ 12.250 -> pos= -9899
+ 3. 2025-04-14 10:16:45 buy   50000 @ 12.250 -> pos= 40101
+ 4. 2025-04-14 10:17:37 sell  13338 @ 12.250 -> pos= 26763
+ 5. 2025-04-14 10:17:37 sell  11602 @ 12.250 -> pos= 15161
+ 6. 2025-04-14 10:17:37 sell    152 @ 12.250 -> pos= 15009
+ 7. 2025-04-14 10:17:37 sell   5983 @ 12.250 -> pos=  9026
+ 8. 2025-04-14 10:25:46 sell    367 @ 12.150 -> pos=  8659

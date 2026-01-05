@@ -27,11 +27,24 @@ pip install pandas openpyxl matplotlib
 ### Run a Backtest
 
 ```bash
-# Run the baseline strategy
+# Sequential version (reference implementation)
 python scripts/run_strategy.py --strategy v1_baseline
+
+# Parallel version (3-8x faster) ⚡ NEW
+python scripts/run_parallel_backtest.py --strategy v1_baseline
 
 # Quick test with 5 securities
 python scripts/run_strategy.py --strategy v1_baseline --max-sheets 5
+
+# Convert to Parquet for maximum speed (one-time) 🚀 NEW
+pip install pyarrow
+python scripts/convert_excel_to_parquet.py
+
+# Run with Parquet + parallel (8-15x faster) 🚀 FASTEST
+python scripts/run_parquet_backtest.py --strategy v1_baseline
+
+# Benchmark comparison
+python scripts/run_parallel_backtest.py --strategy v1_baseline --benchmark
 ```
 
 ### Compare Strategies
@@ -56,11 +69,14 @@ tick-backtest-project/
 │   │       └── handler.py         # Data processor
 │   ├── orderbook.py               # Best bid/ask state manager
 │   ├── data_loader.py             # Excel streaming reader
-│   ├── market_making_backtest.py  # Backtest orchestrator
+│   ├── market_making_backtest.py  # Backtest orchestrator (sequential)
+│   ├── parallel_backtest.py       # Parallel backtest engine ⚡ NEW
 │   └── config_loader.py           # JSON config loader
 │
 ├── scripts/                       # Executable scripts
-│   ├── run_strategy.py            # Generic strategy runner
+│   ├── run_strategy.py            # Sequential strategy runner
+│   ├── run_parallel_backtest.py   # Parallel strategy runner ⚡ NEW
+│   ├── test_parallel_backtest.py  # Parallel tests ⚡ NEW
 │   └── compare_strategies.py      # Strategy comparison tool
 │
 ├── configs/                       # Strategy configurations

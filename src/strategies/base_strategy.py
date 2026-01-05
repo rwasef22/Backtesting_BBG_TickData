@@ -281,6 +281,11 @@ class BaseMarketMakingStrategy(ABC):
             qty: Fill quantity
             timestamp: Fill time
         """
+        # Don't record fills with zero quantity
+        if qty == 0:
+            return
+        
+        original_qty = qty  # Save original qty for trade record
         realized_pnl = 0.0
         
         if side == 'buy':
@@ -323,12 +328,12 @@ class BaseMarketMakingStrategy(ABC):
                     self.position[security] -= qty
                     self.entry_price[security] = total_cost / abs(self.position[security])
         
-        # Record trade
+        # Record trade (use original qty, not the reduced qty)
         self.trades[security].append({
             'timestamp': timestamp,
             'side': side,
             'fill_price': price,
-            'fill_qty': qty,
+            'fill_qty': original_qty,
             'realized_pnl': realized_pnl,
             'position': self.position[security],
             'pnl': self.pnl[security]

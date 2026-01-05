@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from src.market_making_backtest import MarketMakingBacktest
 from src.config_loader import load_strategy_config
+from src.parquet_utils import ensure_parquet_data
 
 
 def import_strategy_handler(strategy_name: str):
@@ -37,11 +38,16 @@ def import_strategy_handler(strategy_name: str):
         module_path = f"src.strategies.{strategy_name}.handler"
         handler_module = __import__(module_path, fromlist=[''])
         
-        # Get the handler factory (assumes create_*_handler naming)
-        handler_name = f"create_{strategy_name.replace('v', 'v')}_handler"
-        if not hasattr(handler_module, handler_name):
-            # Try generic name
-            handler_name = "create_handler"
+        # Map strategy names to handler function names
+        handler_map = {
+            'v1_baseline': 'create_v1_handler',
+            'v2_price_follow_qty_cooldown': 'create_v2_price_follow_qty_cooldown_handler',
+            'v2_1_stop_loss': 'create_v2_1_stop_loss_handler',
+            'v3_liquidity_monitor': 'create_v3_liquidity_monitor_handler'
+        }
+        
+        # Get handler function name
+        handler_name = handler_map.get(strategy_name, 'create_handler')
         
         return getattr(handler_module, handler_name)
     except (ImportError, AttributeError) as e:
@@ -159,6 +165,23 @@ def main():
     print(f"Chunk Size: {args.chunk_size:,}")
     print(f"{'='*80}\n")
     
+    # Ensure Parquet data exists (auto-convert if needed)
+    print("Checking data format...")
+    try:
+        parquet_dir = ensure_parquet_data(
+            excel_path=args.data,
+            parquet_dir='data/parquet',
+            max_sheets=args.max_sheets
+        )
+        use_parquet = True
+        data_path = parquet_dir
+        print(f"Using Parquet format: {parquet_dir}\n")
+    except Exception as e:
+        print(f"Parquet setup failed: {e}")
+        print(f"Falling back to Excel format: {args.data}\n")
+        use_parquet = False
+        data_path = args.data
+    
     # Load configuration
     print("Loading configuration...")
     config = load_strategy_config(args.config)
@@ -175,12 +198,25 @@ def main():
     start_time = time.time()
     
     backtest = MarketMakingBacktest()
-    results = backtest.run_streaming(
-        file_path=args.data,
-        handler=handler,
-        max_sheets=args.max_sheets,
-        chunk_size=args.chunk_size
-    )
+    if use_parquet:
+        # Use Parquet streaming through parquet_loader
+        from src.parquet_loader import stream_parquet_files
+        
+        results = backtest.run_streaming_from_generator(
+            data_generator=stream_parquet_files(
+                parquet_dir=data_path,
+                chunk_size=args.chunk_size,
+                max_files=args.max_sheets
+            ),
+            handler=handler
+        )
+    else:
+        results = backtest.run_streaming(
+            file_path=data_path,
+            handler=handler,
+            max_sheets=args.max_sheets,
+            chunk_size=args.chunk_size
+        )
     
     elapsed = time.time() - start_time
     print(f"\nBacktest completed in {elapsed:.1f} seconds")

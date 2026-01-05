@@ -6,6 +6,7 @@ strategy logic, and state tracking.
 """
 import sys
 import os
+from datetime import time
 
 # Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
@@ -124,15 +125,14 @@ def create_v1_handler(config: dict = None):
                     state['pending_flatten'] = None
                 continue  # Skip all events until we find the trade
 
-            # 3) Handle opening auction
-            is_opening_auction = strategy.is_in_opening_auction(timestamp)
-            
-            # 4) Skip silent period (10:00-10:05)
-            if strategy.is_in_silent_period(timestamp):
+            # 3) STRICT TRADING WINDOW: Only trade between 10:00 and 14:45
+            # Skip everything before 10:00 (opening auction, pre-market)
+            t = timestamp.time()
+            if t < time(10, 0, 0):
                 continue
             
-            # 5) Skip closing auction (14:45-15:00)
-            if strategy.is_in_closing_auction(timestamp):
+            # Skip everything at/after 14:45 (closing auction, after market)
+            if t >= time(14, 45, 0):
                 continue
 
             # Apply update to orderbook
@@ -227,8 +227,8 @@ def create_v1_handler(config: dict = None):
                         }
                         strategy.quote_prices[security]['ask'] = None
             
-            # Check for fills (skip during opening auction)
-            if event_type == 'trade' and not is_opening_auction:
+            # Check for fills (already in valid trading window 10:00-14:45)
+            if event_type == 'trade':
                 strategy.process_trade(security, timestamp, price, volume, orderbook=orderbook)
         
         # Update final state

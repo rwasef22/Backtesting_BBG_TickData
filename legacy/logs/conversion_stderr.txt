@@ -1,0 +1,22 @@
+Traceback (most recent call last):
+  File "C:\Ray\VS Code\tick-backtest-project\scripts\fast_convert_to_parquet.py", line 155, in <module>
+    fast_convert_to_parquet(args.input, args.output, args.max_sheets)
+  File "C:\Ray\VS Code\tick-backtest-project\scripts\fast_convert_to_parquet.py", line 43, in fast_convert_to_parquet
+    for sheet_name, chunk_df in stream_sheets(excel_path, header_row=3, chunk_size=100000, max_sheets=max_sheets):
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Ray\VS Code\tick-backtest-project\src\data_loader.py", line 78, in stream_sheets
+    for row in it:
+               ^^
+  File "C:\Ray\VS Code\tick-backtest-project\.venv\Lib\site-packages\openpyxl\worksheet\_read_only.py", line 85, in _cells_by_row
+    for idx, row in parser.parse():
+                    ^^^^^^^^^^^^^^
+  File "C:\Ray\VS Code\tick-backtest-project\.venv\Lib\site-packages\openpyxl\worksheet\_reader.py", line 167, in parse
+    row = self.parse_row(element)
+          ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Ray\VS Code\tick-backtest-project\.venv\Lib\site-packages\openpyxl\worksheet\_reader.py", line 303, in parse_row
+    cells = [self.parse_cell(el) for el in row]
+             ^^^^^^^^^^^^^^^^^^^
+  File "C:\Ray\VS Code\tick-backtest-project\.venv\Lib\site-packages\openpyxl\worksheet\_reader.py", line 199, in parse_cell
+    value = element.findtext(VALUE_TAG, None) or None
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
