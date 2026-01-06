@@ -1,0 +1,114 @@
+{
+  "EMAAR": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_quantity": 32300,
+    "tick_size": 0.01,
+    "max_position": 64600
+  },
+  "ALDAR": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_quantity": 3000,
+    "tick_size": 0.01,
+    "max_position": 6000
+  },
+  "ADNOCDRI": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_quantity": 5700,
+    "tick_size": 0.01,
+    "max_position": 11400
+  },
+  "ADNOCGAS": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_quantity": 65000,
+    "tick_size": 0.01,
+    "max_position": 130000
+  },
+  "ADNOCLS": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_quantity": 50000,
+    "tick_size": 0.01,
+    "max_position": 100000
+  },
+  "ADCB": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_quantity": 50000,
+    "tick_size": 0.01,
+    "max_position": 100000
+  },
+  "ADIB": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_quantity": 50000,
+    "tick_size": 0.01,
+    "max_position": 100000
+  },
+  "DIB": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_quantity": 50000,
+    "tick_size": 0.01,
+    "max_position": 100000
+  },
+  "FAB": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_quantity": 50000,
+    "tick_size": 0.01,
+    "max_position": 100000
+  },
+  "IHC": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_quantity": 50000,
+    "tick_size": 0.01,
+    "max_position": 100000
+  },
+  "ETISALAT": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_quantity": 50000,
+    "tick_size": 0.01,
+    "max_position": 100000
+  },
+  "TAQA": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_quantity": 50000,
+    "tick_size": 0.01,
+    "max_position": 100000
+  },
+  "DEWA": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_quantity": 50000,
+    "tick_size": 0.01,
+    "max_position": 100000
+  },
+  "MULTIPLY": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_quantity": 50000,
+    "tick_size": 0.01,
+    "max_position": 100000
+  },
+  "PRESIGHT": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_quantity": 50000,
+    "tick_size": 0.01,
+    "max_position": 100000
+  },
+  "ADPORTS": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_quantity": 50000,
+    "tick_size": 0.01,
+    "max_position": 100000
+  }
+}
