@@ -2,13 +2,13 @@
   "EMAAR": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 4467305,
+    "order_notional": 2000000,
     "stop_loss_threshold_pct": 2.0
   },
   "ALDAR": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 2084496,
+    "order_notional": 2000000,
     "stop_loss_threshold_pct": 2.0
   },
   "ADNOCDRI": {
@@ -44,7 +44,7 @@
   "FAB": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 2379148,
+    "order_notional": 2000000,
     "stop_loss_threshold_pct": 2.0
   },
   "MULTIPLY": {

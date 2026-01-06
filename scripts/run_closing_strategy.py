@@ -3,10 +3,11 @@
 Run Closing Strategy Backtest
 
 A closing auction arbitrage strategy that:
-1. Calculates VWAP during pre-close period (default: 14:31-14:46)
-2. Places buy/sell orders at auction (14:46) with spread around VWAP
+1. Calculates VWAP during pre-close period (default: 14:30-14:45)
+2. Places buy/sell orders at auction (14:45) with spread around VWAP
 3. Executes at closing auction if price crosses order price
 4. Exits positions the next day at VWAP price
+5. Stop-loss protection (default: 2%) exits at best opposite price
 
 Usage:
     # Full backtest using Parquet data
@@ -20,6 +21,9 @@ Usage:
     
     # Custom VWAP period
     python scripts/run_closing_strategy.py --vwap-period 20
+    
+    # Custom stop-loss threshold
+    python scripts/run_closing_strategy.py --stop-loss 3.0
 
 Output:
     output/closing_strategy/
@@ -83,11 +87,33 @@ def load_parquet_data(parquet_dir: str, max_sheets: int = None) -> dict:
     return data
 
 
+def load_exchange_mapping(mapping_path: str) -> dict:
+    """
+    Load exchange mapping from JSON file.
+    
+    The mapping file should map security names to exchange codes:
+    {"EMAAR": "DFM", "ADCB": "ADX", ...}
+    
+    Args:
+        mapping_path: Path to exchange mapping JSON file
+        
+    Returns:
+        Dict mapping security -> exchange (ADX or DFM)
+    """
+    if not os.path.exists(mapping_path):
+        print(f"Warning: Exchange mapping file not found at {mapping_path}")
+        print("Using default exchange (ADX) for all securities")
+        return {}
+    
+    with open(mapping_path, 'r') as f:
+        return json.load(f)
+
+
 def process_security_wrapper(args):
     """Wrapper for parallel processing."""
-    security, df, config = args
+    security, df, config, exchange_mapping, auction_fill_pct = args
     try:
-        result = process_security_closing_strategy(security, df, config)
+        result = process_security_closing_strategy(security, df, config, exchange_mapping, auction_fill_pct)
         return result
     except Exception as e:
         return {
@@ -104,10 +130,14 @@ def run_closing_strategy_backtest(
     parquet_dir: str,
     config_path: str,
     output_dir: str,
+    exchange_mapping_path: str = None,
     max_sheets: int = None,
     workers: int = None,
     spread_override: float = None,
     vwap_period_override: int = None,
+    stop_loss_override: float = None,
+    auction_fill_pct: float = 10.0,
+    generate_plots: bool = True,
 ):
     """
     Run closing strategy backtest.
@@ -116,14 +146,19 @@ def run_closing_strategy_backtest(
         parquet_dir: Directory with Parquet files
         config_path: Path to config JSON
         output_dir: Output directory
+        exchange_mapping_path: Path to exchange mapping JSON file
         max_sheets: Limit number of securities
         workers: Number of parallel workers
         spread_override: Override spread_vwap_pct for all securities
         vwap_period_override: Override vwap_preclose_period_min for all securities
+        stop_loss_override: Override stop_loss_threshold_pct for all securities
+        auction_fill_pct: Maximum fill as percentage of auction volume (default 10%)
+        generate_plots: Whether to generate trade plots after backtest (default True)
     """
     print("=" * 60)
     print("CLOSING STRATEGY BACKTEST")
     print("=" * 60)
+    print(f"Auction fill limit: {auction_fill_pct}% of auction volume")
     
     start_time = time.time()
     
@@ -131,21 +166,31 @@ def run_closing_strategy_backtest(
     with open(config_path, 'r') as f:
         config = json.load(f)
     
+    # Load exchange mapping
+    if exchange_mapping_path:
+        exchange_mapping = load_exchange_mapping(exchange_mapping_path)
+        print(f"Loaded exchange mapping for {len(exchange_mapping)} securities")
+    else:
+        exchange_mapping = {}
+        print("No exchange mapping provided, using ADX defaults")
+    
     # Apply overrides
-    if spread_override is not None or vwap_period_override is not None:
+    if spread_override is not None or vwap_period_override is not None or stop_loss_override is not None:
         for security in config:
             if spread_override is not None:
                 config[security]['spread_vwap_pct'] = spread_override
             if vwap_period_override is not None:
                 config[security]['vwap_preclose_period_min'] = vwap_period_override
+            if stop_loss_override is not None:
+                config[security]['stop_loss_threshold_pct'] = stop_loss_override
     
     # Load data
     print(f"\nLoading data from {parquet_dir}...")
     data = load_parquet_data(parquet_dir, max_sheets)
     print(f"Loaded {len(data)} securities")
     
-    # Prepare tasks
-    tasks = [(security, df, config) for security, df in data.items()]
+    # Prepare tasks (include exchange_mapping and auction_fill_pct)
+    tasks = [(security, df, config, exchange_mapping, auction_fill_pct) for security, df in data.items()]
     
     # Process in parallel
     if workers is None:
@@ -214,6 +259,8 @@ def run_closing_strategy_backtest(
             'total_trades': summary.get('total_trades', 0),
             'auction_entries': summary.get('auction_entries', 0),
             'vwap_exits': summary.get('vwap_exits', 0),
+            'stop_losses': summary.get('stop_losses', 0),
+            'eod_flattens': summary.get('eod_flattens', 0),
             'realized_pnl': result.get('pnl', 0),
             'final_position': result.get('position', 0),
         })
@@ -227,6 +274,8 @@ def run_closing_strategy_backtest(
     total_pnl = sum(r.get('pnl', 0) for r in results)
     total_entries = sum(r.get('summary', {}).get('auction_entries', 0) for r in results)
     total_exits = sum(r.get('summary', {}).get('vwap_exits', 0) for r in results)
+    total_stop_losses = sum(r.get('summary', {}).get('stop_losses', 0) for r in results)
+    total_eod_flattens = sum(r.get('summary', {}).get('eod_flattens', 0) for r in results)
     
     print("\n" + "=" * 60)
     print("RESULTS")
@@ -235,6 +284,8 @@ def run_closing_strategy_backtest(
     print(f"Total trades:         {total_trades:,}")
     print(f"  Auction entries:    {total_entries:,}")
     print(f"  VWAP exits:         {total_exits:,}")
+    print(f"  Stop-losses:        {total_stop_losses:,}")
+    print(f"  EOD flattens:       {total_eod_flattens:,}")
     print(f"Total P&L:            {total_pnl:,.2f} AED")
     print(f"Processing time:      {elapsed:.1f}s")
     print(f"\nOutput saved to: {output_dir}")
@@ -250,6 +301,18 @@ def run_closing_strategy_backtest(
         print("\nBOTTOM 5 PERFORMERS:")
         for r in sorted_results[-5:]:
             print(f"  {r['security']}: {r['realized_pnl']:,.2f} AED ({r['total_trades']} trades)")
+    
+    # Generate plots
+    if generate_plots:
+        print("\n" + "-" * 40)
+        print("GENERATING PLOTS...")
+        from scripts.plot_closing_strategy_trades import generate_all_plots
+        plots_dir = os.path.join(output_dir, 'plots')
+        generate_all_plots(
+            parquet_dir=parquet_dir,
+            trades_dir=output_dir,
+            output_dir=plots_dir
+        )
     
     return {
         'total_trades': total_trades,
@@ -305,6 +368,27 @@ Examples:
         type=int,
         help='Override VWAP pre-close period in minutes (default: 15)'
     )
+    parser.add_argument(
+        '--stop-loss',
+        type=float,
+        help='Override stop-loss threshold %% for all securities (default: 2.0)'
+    )
+    parser.add_argument(
+        '--exchange-mapping',
+        default='data/Exchange_mapping.json',
+        help='Path to exchange mapping JSON (default: data/Exchange_mapping.json)'
+    )
+    parser.add_argument(
+        '--auction-fill-pct',
+        type=float,
+        default=10.0,
+        help='Max fill as percentage of auction volume (default: 10.0)'
+    )
+    parser.add_argument(
+        '--no-plots',
+        action='store_true',
+        help='Skip generating plots after backtest'
+    )
     
     args = parser.parse_args()
     
@@ -315,15 +399,21 @@ Examples:
         args.config = os.path.join(PROJECT_ROOT, args.config)
     if not os.path.isabs(args.output_dir):
         args.output_dir = os.path.join(PROJECT_ROOT, args.output_dir)
+    if not os.path.isabs(args.exchange_mapping):
+        args.exchange_mapping = os.path.join(PROJECT_ROOT, args.exchange_mapping)
     
     run_closing_strategy_backtest(
         parquet_dir=args.parquet_dir,
         config_path=args.config,
         output_dir=args.output_dir,
+        exchange_mapping_path=args.exchange_mapping,
         max_sheets=args.max_sheets,
         workers=args.workers,
         spread_override=args.spread,
         vwap_period_override=args.vwap_period,
+        stop_loss_override=args.stop_loss,
+        auction_fill_pct=args.auction_fill_pct,
+        generate_plots=not args.no_plots,
     )
 
 

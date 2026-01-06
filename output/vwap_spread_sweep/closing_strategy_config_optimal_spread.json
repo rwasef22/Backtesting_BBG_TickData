@@ -7,7 +7,7 @@
   },
   "ALDAR": {
     "vwap_preclose_period_min": 15,
-    "spread_vwap_pct": 0.5,
+    "spread_vwap_pct": 1.5,
     "order_notional": 2084496,
     "stop_loss_threshold_pct": 2.0
   },
@@ -31,13 +31,13 @@
   },
   "ADCB": {
     "vwap_preclose_period_min": 15,
-    "spread_vwap_pct": 0.5,
+    "spread_vwap_pct": 1.0,
     "order_notional": 1873081,
     "stop_loss_threshold_pct": 2.0
   },
   "ADIB": {
     "vwap_preclose_period_min": 15,
-    "spread_vwap_pct": 0.5,
+    "spread_vwap_pct": 1.0,
     "order_notional": 1374281,
     "stop_loss_threshold_pct": 2.0
   },
@@ -55,7 +55,7 @@
   },
   "EAND": {
     "vwap_preclose_period_min": 15,
-    "spread_vwap_pct": 0.5,
+    "spread_vwap_pct": 1.5,
     "order_notional": 1799176,
     "stop_loss_threshold_pct": 2.0
   },
@@ -67,7 +67,7 @@
   },
   "SALIK": {
     "vwap_preclose_period_min": 15,
-    "spread_vwap_pct": 0.5,
+    "spread_vwap_pct": 1.0,
     "order_notional": 667242,
     "stop_loss_threshold_pct": 2.0
   },

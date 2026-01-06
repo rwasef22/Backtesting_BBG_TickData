@@ -23,7 +23,7 @@ python scripts/run_closing_strategy.py --spread 0.3 --vwap-period 20
 
 ## Strategy Logic
 
-### Phase 1: VWAP Calculation (14:31 - 14:46)
+### Phase 1: VWAP Calculation (e.g., 14:30 - 14:45)
 
 During the pre-close period, calculate the Volume-Weighted Average Price (VWAP):
 
@@ -31,11 +31,11 @@ During the pre-close period, calculate the Volume-Weighted Average Price (VWAP):
 VWAP = Σ(Price × Volume) / Σ(Volume)
 ```
 
-**Configuration**: `vwap_preclose_period_min` (default: 15 minutes before 14:46)
+**Configuration**: `vwap_preclose_period_min` (default: 15 minutes before 14:45)
 
-### Phase 2: Auction Order Placement (14:46)
+### Phase 2: Auction Order Placement (14:45)
 
-At 14:46, place two orders for the closing auction:
+At 14:45, place two orders for the closing auction:
 
 | Order | Price Formula | Example (VWAP=100, spread=0.5%) |
 |-------|---------------|----------------------------------|
@@ -65,10 +65,10 @@ Exit execution:
 ## Example Trade
 
 ```
-Day 1 (14:31-14:46):
+Day 1 (14:30-14:45):
   VWAP calculated = 3.50 AED
   
-Day 1 (14:46):
+Day 1 (14:45):
   Buy order placed at: 3.50 × 0.995 = 3.4825 → rounded to 3.48
   Sell order placed at: 3.50 × 1.005 = 3.5175 → rounded to 3.52
   
@@ -104,7 +104,7 @@ Day 2 (10:00-14:45):
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `vwap_preclose_period_min` | int | 15 | Minutes before 14:46 to calculate VWAP |
+| `vwap_preclose_period_min` | int | 15 | Minutes before 14:45 to calculate VWAP |
 | `spread_vwap_pct` | float | 0.5 | Spread around VWAP (%) |
 | `order_quantity` | int | 50000 | Quantity to trade |
 | `tick_size` | float | 0.01 | Tick size for price rounding |

@@ -2,8 +2,8 @@
 Closing Strategy Implementation
 
 Strategy Logic:
-1. Calculate VWAP during pre-close period (default: 14:31 - 14:46, configurable)
-2. At 14:46, place:
+1. Calculate VWAP during pre-close period (default: 14:30 - 14:45, configurable)
+2. At 14:45, place:
    - Buy order at VWAP * (1 - spread_vwap)
    - Sell order at VWAP * (1 + spread_vwap)
 3. At closing auction (first trade >= 14:55):
@@ -14,6 +14,8 @@ Strategy Logic:
 """
 
 import pandas as pd
+import json
+import os
 from datetime import datetime, time, timedelta
 from typing import Dict, Optional, List, Tuple
 from dataclasses import dataclass, field
@@ -62,26 +64,34 @@ class ClosingStrategy:
     """
     
     # UAE market hours
-    PRECLOSE_END_TIME = time(14, 46, 0)  # When we place auction orders
+    PRECLOSE_END_TIME = time(14, 45, 0)  # When VWAP calculation ends and we place auction orders
     CLOSING_AUCTION_TIME = time(14, 55, 0)  # First trade at/after this is closing price
     TRADING_START_TIME = time(10, 0, 0)  # Regular trading starts
     TRADING_END_TIME = time(14, 45, 0)  # Regular trading ends
+    STOP_LOSS_START_TIME = time(10, 10, 0)  # Stop-loss monitoring starts
+    STOP_LOSS_END_TIME = time(14, 44, 0)  # Stop-loss monitoring ends
     
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, exchange_mapping: Dict[str, str] = None,
+                 auction_fill_pct: float = 10.0):
         """
         Initialize strategy with configuration.
         
         Config per security:
         {
             "SECURITY": {
-                "vwap_preclose_period_min": 15,  # Minutes before 14:46 to calculate VWAP
+                "vwap_preclose_period_min": 15,  # Minutes before 14:45 to calculate VWAP
                 "spread_vwap_pct": 0.5,          # Spread around VWAP (%)
-                "order_quantity": 50000,          # Quantity to trade
-                "tick_size": 0.01                 # Tick size for rounding
+                "order_notional": 250000,         # Local currency value for orders
+                "stop_loss_threshold_pct": 2.0   # Stop-loss threshold (%)
             }
         }
+        
+        Exchange mapping: {"SECURITY": "ADX" or "DFM"}
+        auction_fill_pct: Maximum fill as percentage of auction volume (default 10%)
         """
         self.config = config
+        self.exchange_mapping = exchange_mapping or {}
+        self.auction_fill_pct = auction_fill_pct / 100.0  # Convert to decimal
         
         # Per-security state
         self.vwap_data: Dict[str, Dict] = {}  # {security: {sum_pv: float, sum_v: int}}
@@ -90,12 +100,20 @@ class ClosingStrategy:
         self.trades: Dict[str, List[Trade]] = {}  # {security: [trades]}
         self.pnl: Dict[str, float] = {}  # {security: realized_pnl}
         self.position: Dict[str, int] = {}  # {security: position}
+        self.entry_price: Dict[str, float] = {}  # {security: avg_entry_price}
+        
+        # Best bid/ask tracking for stop-loss execution
+        self.best_bid: Dict[str, float] = {}  # {security: best_bid}
+        self.best_ask: Dict[str, float] = {}  # {security: best_ask}
         
         # Tracking
         self.current_date: Dict[str, datetime] = {}
         self.vwap_calculated: Dict[str, bool] = {}
         self.auction_orders_placed: Dict[str, bool] = {}
         self.closing_price_processed: Dict[str, bool] = {}
+        
+        # Auction volume tracking for execution probability
+        self.auction_volume: Dict[str, int] = {}  # {security: total_auction_volume}
     
     def initialize_security(self, security: str):
         """Initialize state for a security."""
@@ -103,12 +121,16 @@ class ClosingStrategy:
             self.trades[security] = []
             self.pnl[security] = 0.0
             self.position[security] = 0
+            self.entry_price[security] = 0.0
+            self.best_bid[security] = 0.0
+            self.best_ask[security] = 0.0
             self.vwap_data[security] = {'sum_pv': 0.0, 'sum_v': 0}
             self.auction_orders[security] = {}
             self.vwap_calculated[security] = False
             self.auction_orders_placed[security] = False
             self.closing_price_processed[security] = False
             self.current_date[security] = None
+            self.auction_volume[security] = 0
     
     def get_config(self, security: str) -> dict:
         """Get configuration for a security with defaults."""
@@ -116,10 +138,50 @@ class ClosingStrategy:
         return {
             'vwap_preclose_period_min': cfg.get('vwap_preclose_period_min', 15),
             'spread_vwap_pct': cfg.get('spread_vwap_pct', 0.5),
-            'order_quantity': cfg.get('order_quantity', 50000),
-            'tick_size': cfg.get('tick_size', 0.01),
-            'max_position': cfg.get('max_position', 100000),
+            'order_notional': cfg.get('order_notional', 250000),  # Local currency value for orders
+            'stop_loss_threshold_pct': cfg.get('stop_loss_threshold_pct', 2.0),
         }
+    
+    def get_exchange(self, security: str) -> str:
+        """Get exchange for a security from mapping. Defaults to ADX."""
+        return self.exchange_mapping.get(security, 'ADX')
+    
+    def get_tick_size(self, security: str, price: float) -> float:
+        """
+        Get tick size based on price and exchange.
+        
+        ADX tick sizes:
+        - price < 1: 0.001
+        - 1 <= price < 10: 0.01
+        - 10 <= price < 50: 0.02
+        - 50 <= price < 100: 0.05
+        - price >= 100: 0.1
+        
+        DFM tick sizes:
+        - price < 1: 0.001
+        - 1 <= price < 10: 0.01
+        - price >= 10: 0.05
+        """
+        exchange = self.get_exchange(security)
+        
+        if exchange == 'DFM':
+            if price < 1:
+                return 0.001
+            elif price < 10:
+                return 0.01
+            else:
+                return 0.05
+        else:  # ADX (default)
+            if price < 1:
+                return 0.001
+            elif price < 10:
+                return 0.01
+            elif price < 50:
+                return 0.02
+            elif price < 100:
+                return 0.05
+            else:
+                return 0.1
     
     def round_to_tick(self, price: float, tick_size: float) -> float:
         """Round price to nearest tick."""
@@ -141,7 +203,7 @@ class ClosingStrategy:
         return vwap_start <= t < self.PRECLOSE_END_TIME
     
     def is_auction_order_time(self, timestamp: datetime) -> bool:
-        """Check if it's time to place auction orders (14:46)."""
+        """Check if it's time to place auction orders (14:45 - 14:55)."""
         t = timestamp.time()
         return t >= self.PRECLOSE_END_TIME and t < self.CLOSING_AUCTION_TIME
     
@@ -154,6 +216,94 @@ class ClosingStrategy:
         t = timestamp.time()
         return self.TRADING_START_TIME <= t < self.TRADING_END_TIME
     
+    def update_orderbook(self, security: str, event_type: str, price: float):
+        """Update best bid/ask from quote events."""
+        if event_type == 'bid' and price > 0:
+            self.best_bid[security] = price
+        elif event_type == 'ask' and price > 0:
+            self.best_ask[security] = price
+    
+    def check_stop_loss(self, security: str, timestamp: datetime) -> Optional[Trade]:
+        """
+        Check if stop-loss should trigger and execute if needed.
+        
+        Stop-loss triggers when unrealized P&L exceeds threshold.
+        - Long position: sell at best bid
+        - Short position: buy at best ask
+        - Only active between 10:10 and 14:44
+        
+        Returns:
+            Trade if stop-loss executed, None otherwise
+        """
+        # Check if within stop-loss monitoring window (10:10 - 14:44)
+        t = timestamp.time()
+        if not (self.STOP_LOSS_START_TIME <= t < self.STOP_LOSS_END_TIME):
+            return None
+        
+        position = self.position.get(security, 0)
+        if position == 0:
+            return None
+        
+        entry_price = self.entry_price.get(security, 0)
+        if entry_price <= 0:
+            return None
+        
+        cfg = self.get_config(security)
+        stop_loss_pct = cfg['stop_loss_threshold_pct']
+        
+        # Calculate unrealized P&L percentage
+        if position > 0:
+            # Long: mark-to-market at best bid
+            mark_price = self.best_bid.get(security, 0)
+            if mark_price <= 0:
+                return None
+            unrealized_pnl_pct = ((mark_price - entry_price) / entry_price) * 100
+        else:
+            # Short: mark-to-market at best ask
+            mark_price = self.best_ask.get(security, 0)
+            if mark_price <= 0:
+                return None
+            unrealized_pnl_pct = ((entry_price - mark_price) / entry_price) * 100
+        
+        # Check if loss exceeds threshold (negative unrealized P&L)
+        if unrealized_pnl_pct >= -stop_loss_pct:
+            return None
+        
+        # Execute stop-loss
+        if position > 0:
+            # Long position: sell at best bid
+            exit_price = self.best_bid[security]
+            exit_qty = position
+            exit_side = 'sell'
+            realized_pnl = (exit_price - entry_price) * exit_qty
+        else:
+            # Short position: buy at best ask
+            exit_price = self.best_ask[security]
+            exit_qty = abs(position)
+            exit_side = 'buy'
+            realized_pnl = (entry_price - exit_price) * exit_qty
+        
+        # Update state
+        self.position[security] = 0
+        self.entry_price[security] = 0.0
+        self.pnl[security] = self.pnl.get(security, 0) + realized_pnl
+        
+        # Cancel any pending exit order
+        if security in self.exit_orders:
+            del self.exit_orders[security]
+        
+        trade = Trade(
+            timestamp=timestamp,
+            side=exit_side,
+            price=exit_price,
+            quantity=exit_qty,
+            realized_pnl=realized_pnl,
+            trade_type='stop_loss',
+            vwap_reference=entry_price
+        )
+        self.trades[security].append(trade)
+        return trade
+    
     def reset_daily_state(self, security: str, new_date: datetime):
         """Reset daily state for a new trading day."""
         self.vwap_data[security] = {'sum_pv': 0.0, 'sum_v': 0}
@@ -162,6 +312,7 @@ class ClosingStrategy:
         self.auction_orders_placed[security] = False
         self.closing_price_processed[security] = False
         self.current_date[security] = new_date.date()
+        self.auction_volume[security] = 0  # Reset auction volume for new day
     
     def update_vwap(self, security: str, price: float, volume: int):
         """Update VWAP calculation with a trade."""
@@ -180,42 +331,56 @@ class ClosingStrategy:
         """Place buy and sell orders for the closing auction."""
         cfg = self.get_config(security)
         spread_pct = cfg['spread_vwap_pct'] / 100.0
-        tick_size = cfg['tick_size']
-        quantity = cfg['order_quantity']
         
-        # Calculate order prices
-        buy_price = self.round_to_tick(vwap * (1 - spread_pct), tick_size)
-        sell_price = self.round_to_tick(vwap * (1 + spread_pct), tick_size)
+        # Calculate quantity from notional value (default 250,000 AED)
+        order_notional = cfg['order_notional']
+        quantity = round(order_notional / vwap)  # Round to closest share
         
-        # Check position limits before placing orders
-        current_pos = self.position.get(security, 0)
-        max_pos = cfg['max_position']
+        # Calculate order prices with dynamic tick size based on price and exchange
+        buy_price_raw = vwap * (1 - spread_pct)
+        sell_price_raw = vwap * (1 + spread_pct)
         
-        # Only place buy order if we have room to go long
-        if current_pos < max_pos:
-            buy_qty = min(quantity, max_pos - current_pos)
-            if buy_qty > 0:
-                self.auction_orders[security]['buy'] = AuctionOrder(
-                    price=buy_price,
-                    quantity=buy_qty,
-                    side='buy',
-                    placed_time=timestamp,
-                    vwap_reference=vwap
-                )
+        buy_tick_size = self.get_tick_size(security, buy_price_raw)
+        sell_tick_size = self.get_tick_size(security, sell_price_raw)
         
-        # Only place sell order if we have room to go short
-        if current_pos > -max_pos:
-            sell_qty = min(quantity, max_pos + current_pos)
-            if sell_qty > 0:
-                self.auction_orders[security]['sell'] = AuctionOrder(
-                    price=sell_price,
-                    quantity=sell_qty,
-                    side='sell',
-                    placed_time=timestamp,
-                    vwap_reference=vwap
-                )
+        buy_price = self.round_to_tick(buy_price_raw, buy_tick_size)
+        sell_price = self.round_to_tick(sell_price_raw, sell_tick_size)
+        
+        # Place buy order
+        if quantity > 0:
+            self.auction_orders[security]['buy'] = AuctionOrder(
+                price=buy_price,
+                quantity=quantity,
+                side='buy',
+                placed_time=timestamp,
+                vwap_reference=vwap
+            )
+        
+            # Place sell order
+            self.auction_orders[security]['sell'] = AuctionOrder(
+                price=sell_price,
+                quantity=quantity,
+                side='sell',
+                placed_time=timestamp,
+                vwap_reference=vwap
+            )
         
         self.auction_orders_placed[security] = True
+    
+    def update_auction_volume(self, security: str, volume: int):
+        """Update auction volume accumulator."""
+        self.auction_volume[security] = self.auction_volume.get(security, 0) + volume
+    
+    def get_max_fill_quantity(self, security: str, order_quantity: int) -> int:
+        """
+        Get maximum fill quantity based on auction volume.
+        
+        Execution probability: We can only fill up to auction_fill_pct of total auction volume.
+        This ensures we're not assuming unrealistic fills.
+        """
+        auction_vol = self.auction_volume.get(security, 0)
+        max_fill = int(auction_vol * self.auction_fill_pct)
+        return min(order_quantity, max_fill)
     
     def process_closing_price(self, security: str, close_price: float, 
                               timestamp: datetime) -> List[Trade]:
@@ -223,6 +388,7 @@ class ClosingStrategy:
         Process the closing auction price.
         
         If close price crosses our order price, we're executed.
+        Fill quantity is limited to auction_fill_pct of auction volume.
         """
         executed_trades = []
         orders = self.auction_orders.get(security, {})
@@ -231,45 +397,57 @@ class ClosingStrategy:
         if 'buy' in orders:
             buy_order = orders['buy']
             if close_price <= buy_order.price:
-                # Buy order executed
-                trade = self._execute_auction_trade(
-                    security, buy_order, close_price, timestamp
-                )
-                executed_trades.append(trade)
-                
-                # Create exit order for next day
-                self._create_exit_order(security, trade, timestamp)
+                # Calculate fill quantity (limited by auction volume)
+                fill_qty = self.get_max_fill_quantity(security, buy_order.quantity)
+                if fill_qty > 0:
+                    # Buy order executed (possibly partial)
+                    trade = self._execute_auction_trade(
+                        security, buy_order, close_price, timestamp, fill_qty
+                    )
+                    executed_trades.append(trade)
+                    
+                    # Create exit order for next day
+                    self._create_exit_order(security, trade, timestamp)
         
         # Check sell order execution
         if 'sell' in orders:
             sell_order = orders['sell']
             if close_price >= sell_order.price:
-                # Sell order executed
-                trade = self._execute_auction_trade(
-                    security, sell_order, close_price, timestamp
-                )
-                executed_trades.append(trade)
-                
-                # Create exit order for next day
-                self._create_exit_order(security, trade, timestamp)
+                # Calculate fill quantity (limited by auction volume)
+                fill_qty = self.get_max_fill_quantity(security, sell_order.quantity)
+                if fill_qty > 0:
+                    # Sell order executed (possibly partial)
+                    trade = self._execute_auction_trade(
+                        security, sell_order, close_price, timestamp, fill_qty
+                    )
+                    executed_trades.append(trade)
+                    
+                    # Create exit order for next day
+                    self._create_exit_order(security, trade, timestamp)
         
         self.closing_price_processed[security] = True
         return executed_trades
     
     def _execute_auction_trade(self, security: str, order: AuctionOrder,
-                               execution_price: float, timestamp: datetime) -> Trade:
-        """Execute an auction order."""
-        # Update position
+                               execution_price: float, timestamp: datetime,
+                               fill_quantity: int = None) -> Trade:
+        """Execute an auction order (possibly partial fill)."""
+        # Use fill_quantity if provided, otherwise full order quantity
+        qty = fill_quantity if fill_quantity is not None else order.quantity
+        
+        # Update position and entry price
         if order.side == 'buy':
-            self.position[security] = self.position.get(security, 0) + order.quantity
+            self.position[security] = self.position.get(security, 0) + qty
+            self.entry_price[security] = execution_price
         else:
-            self.position[security] = self.position.get(security, 0) - order.quantity
+            self.position[security] = self.position.get(security, 0) - qty
+            self.entry_price[security] = execution_price
         
         trade = Trade(
             timestamp=timestamp,
             side=order.side,
             price=execution_price,
-            quantity=order.quantity,
+            quantity=qty,
             realized_pnl=0.0,  # P&L realized on exit
             trade_type='auction_entry',
             vwap_reference=order.vwap_reference
@@ -286,8 +464,9 @@ class ClosingStrategy:
         # Exit at the VWAP that was used for entry calculation
         exit_price = entry_trade.vwap_reference
         
-        cfg = self.get_config(security)
-        exit_price = self.round_to_tick(exit_price, cfg['tick_size'])
+        # Round to appropriate tick size based on price and exchange
+        tick_size = self.get_tick_size(security, exit_price)
+        exit_price = self.round_to_tick(exit_price, tick_size)
         
         # Next trading day (simplified - just next calendar day)
         # In production, would need proper trading calendar
@@ -374,6 +553,71 @@ class ClosingStrategy:
         
         return trade
     
+    def flatten_position_at_close(self, security: str, close_price: float, 
+                                   timestamp: datetime) -> Optional[Trade]:
+        """
+        Flatten any remaining position at the closing price.
+        
+        Called at end of day if exit order hasn't fully filled.
+        This ensures we don't carry positions overnight beyond one day.
+        
+        Only flattens exit orders whose target_date is TODAY (meaning they
+        were created yesterday). Newly created exit orders (target_date = tomorrow)
+        should not be flattened yet - they need a chance to fill tomorrow.
+        
+        Args:
+            security: Security symbol
+            close_price: Closing auction price
+            timestamp: Timestamp of closing
+            
+        Returns:
+            Trade if position was flattened, None otherwise
+        """
+        # Check if we have a pending exit order with remaining quantity
+        if security not in self.exit_orders:
+            return None
+        
+        exit_order = self.exit_orders[security]
+        if exit_order.remaining_qty <= 0:
+            return None
+        
+        # Only flatten exit orders that were targeted for TODAY
+        # If target_date is in the future (tomorrow), this is a newly created
+        # exit order that should have a chance to fill tomorrow
+        if exit_order.target_date > timestamp.date():
+            return None
+        
+        # Flatten the remaining position at closing price
+        fill_qty = exit_order.remaining_qty
+        
+        # Calculate P&L
+        if exit_order.side == 'sell':
+            # We're selling what we bought
+            realized_pnl = (close_price - exit_order.entry_price) * fill_qty
+            self.position[security] -= fill_qty
+        else:
+            # We're buying back what we sold short
+            realized_pnl = (exit_order.entry_price - close_price) * fill_qty
+            self.position[security] += fill_qty
+        
+        self.pnl[security] = self.pnl.get(security, 0) + realized_pnl
+        
+        trade = Trade(
+            timestamp=timestamp,
+            side=exit_order.side,
+            price=close_price,
+            quantity=fill_qty,
+            realized_pnl=realized_pnl,
+            trade_type='eod_flatten',
+            vwap_reference=exit_order.price
+        )
+        self.trades[security].append(trade)
+        
+        # Remove the exit order
+        del self.exit_orders[security]
+        
+        return trade
+    
     def get_strategy_name(self) -> str:
         return "closing_strategy"
     
@@ -385,6 +629,8 @@ class ClosingStrategy:
             'total_trades': len(trades),
             'auction_entries': len([t for t in trades if t.trade_type == 'auction_entry']),
             'vwap_exits': len([t for t in trades if t.trade_type == 'vwap_exit']),
+            'stop_losses': len([t for t in trades if t.trade_type == 'stop_loss']),
+            'eod_flattens': len([t for t in trades if t.trade_type == 'eod_flatten']),
             'realized_pnl': self.pnl.get(security, 0),
             'final_position': self.position.get(security, 0),
         }

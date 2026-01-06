@@ -2,97 +2,97 @@
   "EMAAR": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 4467305,
+    "order_notional": 250000,
     "stop_loss_threshold_pct": 2.0
   },
   "ALDAR": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 2084496,
+    "order_notional": 250000,
     "stop_loss_threshold_pct": 2.0
   },
   "ADNOCDRI": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 940139,
+    "order_notional": 250000,
     "stop_loss_threshold_pct": 2.0
   },
   "ADNOCGAS": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 1484468,
+    "order_notional": 250000,
     "stop_loss_threshold_pct": 2.0
   },
   "ADNOCLS": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 330610,
+    "order_notional": 250000,
     "stop_loss_threshold_pct": 2.0
   },
   "ADCB": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 1873081,
+    "order_notional": 250000,
     "stop_loss_threshold_pct": 2.0
   },
   "ADIB": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 1374281,
+    "order_notional": 250000,
     "stop_loss_threshold_pct": 2.0
   },
   "FAB": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 2379148,
+    "order_notional": 250000,
     "stop_loss_threshold_pct": 2.0
   },
   "MULTIPLY": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 387012,
+    "order_notional": 250000,
     "stop_loss_threshold_pct": 2.0
   },
   "EAND": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 1799176,
+    "order_notional": 250000,
     "stop_loss_threshold_pct": 2.0
   },
   "EMIRATES": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 1982247,
+    "order_notional": 250000,
     "stop_loss_threshold_pct": 2.0
   },
   "SALIK": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 667242,
+    "order_notional": 250000,
     "stop_loss_threshold_pct": 2.0
   },
   "PARKIN": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 117464,
+    "order_notional": 250000,
     "stop_loss_threshold_pct": 2.0
   },
   "MODON": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 136052,
+    "order_notional": 250000,
     "stop_loss_threshold_pct": 2.0
   },
   "SPINNEYS": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 13917,
+    "order_notional": 250000,
     "stop_loss_threshold_pct": 2.0
   },
   "TALABAT": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 390548,
+    "order_notional": 250000,
     "stop_loss_threshold_pct": 2.0
   }
 }

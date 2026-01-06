@@ -2,13 +2,13 @@
   "EMAAR": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 4467305,
+    "order_notional": 1000000,
     "stop_loss_threshold_pct": 2.0
   },
   "ALDAR": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 2084496,
+    "order_notional": 1000000,
     "stop_loss_threshold_pct": 2.0
   },
   "ADNOCDRI": {
@@ -20,7 +20,7 @@
   "ADNOCGAS": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 1484468,
+    "order_notional": 1000000,
     "stop_loss_threshold_pct": 2.0
   },
   "ADNOCLS": {
@@ -31,20 +31,20 @@
   },
   "ADCB": {
     "vwap_preclose_period_min": 15,
-    "spread_vwap_pct": 0.5,
-    "order_notional": 1873081,
+    "spread_vwap_pct": 1.0,
+    "order_notional": 1000000,
     "stop_loss_threshold_pct": 2.0
   },
   "ADIB": {
     "vwap_preclose_period_min": 15,
-    "spread_vwap_pct": 0.5,
-    "order_notional": 1374281,
+    "spread_vwap_pct": 1.0,
+    "order_notional": 1000000,
     "stop_loss_threshold_pct": 2.0
   },
   "FAB": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 2379148,
+    "order_notional": 1000000,
     "stop_loss_threshold_pct": 2.0
   },
   "MULTIPLY": {
@@ -55,19 +55,19 @@
   },
   "EAND": {
     "vwap_preclose_period_min": 15,
-    "spread_vwap_pct": 0.5,
-    "order_notional": 1799176,
+    "spread_vwap_pct": 1.5,
+    "order_notional": 1000000,
     "stop_loss_threshold_pct": 2.0
   },
   "EMIRATES": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
-    "order_notional": 1982247,
+    "order_notional": 1000000,
     "stop_loss_threshold_pct": 2.0
   },
   "SALIK": {
     "vwap_preclose_period_min": 15,
-    "spread_vwap_pct": 0.5,
+    "spread_vwap_pct": 1.0,
     "order_notional": 667242,
     "stop_loss_threshold_pct": 2.0
   },
