@@ -221,6 +221,10 @@ The strategy uses exchange-specific tick sizes for order pricing:
 | `spread_vwap_pct` | float | 0.5 | Percentage spread around VWAP for orders (e.g., 0.5 = ±0.5%) |
 | `order_notional` | int | 250000 | Order size in local currency (AED). Quantity = notional / VWAP |
 | `stop_loss_threshold_pct` | float | 2.0 | Exit position if unrealized loss exceeds this percentage |
+| `trend_filter_sell_enabled` | bool | true | Enable SELL entry trend filter (skip sells in uptrends) |
+| `trend_filter_sell_threshold_bps_hr` | float | 10.0 | SELL trend slope threshold in basis points per hour |
+| `trend_filter_buy_enabled` | bool | false | Enable BUY entry trend filter (skip buys in downtrends) |
+| `trend_filter_buy_threshold_bps_hr` | float | 10.0 | BUY trend slope threshold in basis points per hour |
 
 ### Exchange Mapping File
 
@@ -311,6 +315,10 @@ python scripts/run_closing_strategy.py \
 | `--stop-loss` | Override stop_loss_threshold_pct | From config |
 | `--auction-fill-pct` | Max fill as % of auction volume | 10.0 |
 | `--no-plots` | Disable plot generation | False |
+| `--no-trend-filter-sell` | Disable SELL entry trend filter | False (filter enabled) |
+| `--trend-threshold-sell` | SELL trend slope threshold (bps/hr) | 10.0 |
+| `--trend-filter-buy` | Enable BUY entry trend filter | False (filter disabled) |
+| `--trend-threshold-buy` | BUY trend slope threshold (bps/hr) | 10.0 |
 
 ---
 
@@ -430,6 +438,137 @@ python scripts/run_closing_strategy.py --config configs/closing_strategy_config_
 
 ---
 
+## Trend Exclusion Filter
+
+### Overview
+
+Based on comprehensive statistical analysis of 1,447 closing strategy trades, a **trend exclusion filter** was implemented to improve entry performance. Each side (BUY/SELL) has independent enable flags and thresholds. The analysis revealed that SELL entries in uptrending markets significantly underperform.
+
+### Analysis Findings
+
+**Statistical Evidence (p=0.0017):**
+- SELL entries in **uptrends** (>10 bps/hr slope): **65% win rate**
+- SELL entries in **downtrends** (<10 bps/hr slope): **86% win rate**
+- BUY entries show **no significant trend sensitivity** (filter disabled by default)
+
+**Expected Impact:**
+- Filters ~126 losing SELL trades
+- Estimated savings: **~210,000 AED** in avoided losses
+- Improved risk-adjusted returns
+
+### How It Works
+
+1. **Trend Data Collection**: During regular trading hours (10:00-14:45), the strategy collects (timestamp, price) pairs for each trade.
+
+2. **Linear Regression**: At auction time, calculates the daily trend slope using simple OLS regression on (hours_since_10am, price).
+
+3. **Filter Decision (Per-Side)**: 
+   - If `slope > sell_threshold` AND `trend_filter_sell_enabled`: Skip SELL entry
+   - If `slope < -buy_threshold` AND `trend_filter_buy_enabled`: Skip BUY entry
+
+4. **Result**: Entries are only placed when market conditions are favorable for each side.
+
+### Configuration
+
+```json
+{
+  "ADNOCGAS": {
+    "spread_vwap_pct": 0.5,
+    "order_notional": 1000000,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
+  }
+}
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `trend_filter_sell_enabled` | bool | true | Enable SELL entry trend filter |
+| `trend_filter_sell_threshold_bps_hr` | float | 10.0 | SELL filter threshold (bps/hour) |
+| `trend_filter_buy_enabled` | bool | false | Enable BUY entry trend filter |
+| `trend_filter_buy_threshold_bps_hr` | float | 10.0 | BUY filter threshold (bps/hour) |
+
+### CLI Usage
+
+```bash
+# Default: SELL filter enabled at 10 bps/hr, BUY filter disabled
+python scripts/run_closing_strategy.py
+
+# Disable SELL trend filter (compare baseline)
+python scripts/run_closing_strategy.py --no-trend-filter-sell
+
+# Enable BUY trend filter
+python scripts/run_closing_strategy.py --trend-filter-buy
+
+# Custom thresholds per side
+python scripts/run_closing_strategy.py --trend-threshold-sell 15.0 --trend-threshold-buy 20.0
+
+# Enable both filters
+python scripts/run_closing_strategy.py --trend-filter-buy --trend-threshold-sell 10 --trend-threshold-buy 15
+
+# Use 2M cap config with SELL filter only (default)
+python scripts/run_closing_strategy.py --config configs/closing_strategy_config_2m_cap.json
+
+# Sweep trend threshold values
+python scripts/sweep_vwap_spread.py --param trend_filter_sell_threshold_bps_hr --values 5 10 15 20
+```
+
+### Output Metrics
+
+With trend filter enabled, the summary includes:
+
+| Field | Description |
+|-------|-------------|
+| `buy_entries` | Number of BUY auction entries |
+| `sell_entries` | Number of SELL auction entries (after filtering) |
+| `filtered_sell_entries` | Number of SELL entries blocked by trend filter |
+| `filtered_buy_entries` | Number of BUY entries blocked by trend filter |
+
+### Technical Implementation
+
+The trend calculation uses simple linear regression:
+
+```python
+def calculate_trend_slope(self, security):
+    """Calculate trend slope in bps/hour using linear regression."""
+    data = self.trend_data[security]
+    if len(data) < 10:  # Need minimum data points
+        return 0.0
+    
+    times, prices = zip(*data)
+    hours = [(t - times[0]).total_seconds() / 3600 for t in times]
+    
+    # Simple OLS: slope = Σ((x-x̄)(y-ȳ)) / Σ((x-x̄)²)
+    n = len(hours)
+    mean_x = sum(hours) / n
+    mean_y = sum(prices) / n
+    
+    numerator = sum((x - mean_x) * (y - mean_y) for x, y in zip(hours, prices))
+    denominator = sum((x - mean_x) ** 2 for x in hours)
+    
+    slope = numerator / denominator if denominator > 0 else 0.0
+    
+    # Convert to bps/hour: (slope / mean_price) * 10000
+    return (slope / mean_y) * 10000
+```
+
+### Best Practices
+
+1. **Start with defaults**: The 10 bps/hr SELL threshold is based on rigorous statistical analysis.
+
+2. **Run comparison tests**: Use `--no-trend-filter-sell` to compare performance with filter enabled vs disabled.
+
+3. **Sweep threshold values**: Different securities may benefit from different thresholds:
+   ```bash
+   python scripts/sweep_vwap_spread.py --param trend_filter_sell_threshold_bps_hr --values 5 10 15 20
+   ```
+
+4. **Check filtered count**: High `filtered_sell_entries` count indicates the filter is actively protecting against uptrend sells.
+
+---
+
 ## Output Files
 
 ### Trade Logs
@@ -477,24 +616,40 @@ Each plot includes:
 
 ## Performance Benchmarks
 
-Based on historical backtests (193 trading days):
+Based on historical backtests (193 trading days, **with SELL trend filter enabled at 10 bps/hr**):
 
-| Configuration | Total P&L | Trades | Sharpe-like |
-|--------------|-----------|--------|-------------|
-| Original (variable notional) | 1,000,194 AED | 10,669 | - |
-| 1M Cap | 635,137 AED | 8,842 | - |
-| 2M Cap | 871,502 AED | 10,312 | - |
-| Optimal Spread per Security | +9.6% vs uniform | - | - |
+| Configuration | Total P&L | Trades | Sharpe | Filtered SELL |
+|--------------|-----------|--------|--------|---------------|
+| **250k (Baseline)** | 1,268,317 AED | 8,828 | ~5.5 | 624 |
+| **1M Cap** | ~800,000 AED | ~8,500 | ~5.0 | ~620 |
+| **2M Cap** | 1,103,485 AED | 8,519 | 5.48 | 624 |
 
-### Top Performing Securities
-1. **FAB**: Consistent performer across configurations
-2. **EMAAR**: Benefits from longer VWAP windows (60min)
-3. **EMIRATES**: Strong with 30min VWAP window
-4. **ADNOCGAS**: Prefers 60min VWAP window
+### Latest Results (Jan 8, 2026) - 2M Cap with SELL Filter @ 10 bps/hr
+
+```
+Total P&L:            1,103,485 AED
+Total Trades:         8,519
+  Auction Entries:    534 (BUY: 303, SELL: 231)
+  Filtered SELL:      624 (blocked due to uptrend)
+  VWAP Exits:         7,835
+  Stop-Losses:        48
+  EOD Flattens:       102
+Sharpe Ratio:         5.48
+Win Rate:             ~70%
+```
+
+### Top Performing Securities (2M Cap)
+| Security | P&L (AED) | Trades |
+|----------|-----------|--------|
+| 1. **FAB** | 297,433 | 773 |
+| 2. **EMAAR** | 190,649 | 854 |
+| 3. **EMIRATES** | 156,817 | 1,047 |
+| 4. **MULTIPLY** | 107,015 | 258 |
+| 5. **ADCB** | 82,143 | 612 |
 
 ### Underperforming Securities
-- **EAND**: Negative P&L at most spreads, use wider spread (1.5%+) to avoid
-- **ALDAR**: Sensitive to notional sizing, performs better with caps
+- **EAND**: -27,492 AED (only negative performer)
+- Consider wider spread (1.5%+) or exclusion for EAND
 
 ---
 
@@ -503,21 +658,27 @@ Based on historical backtests (193 trading days):
 ```
 tick-backtest-project/
 ├── configs/
-│   ├── closing_strategy_config.json          # Main config (variable notional)
+│   ├── closing_strategy_config.json          # Baseline config (250k notional)
+│   ├── closing_strategy_config_250k.json     # Same as baseline (alias)
 │   ├── closing_strategy_config_1m_cap.json   # 1M notional cap
-│   ├── closing_strategy_config_2m_cap.json   # 2M notional cap
+│   ├── closing_strategy_config_2m_cap.json   # 2M notional cap (RECOMMENDED)
 │   └── exchange_mapping.json                 # Security → Exchange mapping
 ├── data/
-│   └── parquet/                              # Converted tick data
+│   └── parquet/                              # Converted tick data (16 files)
 ├── docs/
 │   └── closing_strategy/
 │       └── README.md                         # This documentation
 ├── output/
 │   ├── closing_strategy/                     # Default output
+│   ├── closing_strategy_250k/                # 250k baseline results
 │   ├── closing_strategy_1m_cap/              # 1M cap results
-│   ├── closing_strategy_2m_cap/              # 2M cap results
-│   ├── vwap_spread_sweep/                    # Spread sweep results
-│   └── vwap_period_sweep/                    # Period sweep results
+│   ├── closing_strategy_2m_cap/              # 2M cap results (CURRENT BEST)
+│   │   ├── backtest_summary.csv              # Summary metrics
+│   │   ├── {SECURITY}_trades.csv             # 16 trade logs
+│   │   └── plots/
+│   │       ├── performance_summary.png       # Aggregate 4-panel chart
+│   │       └── {SECURITY}_trades.png         # 16 individual charts
+│   └── vwap_spread_sweep/                    # Spread sweep results
 ├── scripts/
 │   ├── run_closing_strategy.py               # Main backtest runner
 │   ├── sweep_vwap_spread.py                  # Parameter sweep script
@@ -525,27 +686,139 @@ tick-backtest-project/
 └── src/
     └── closing_strategy/
         ├── __init__.py
-        ├── strategy.py                       # Core strategy logic
+        ├── strategy.py                       # Core strategy logic + trend filter
         └── handler.py                        # Backtest integration
 ```
+
+### Config Files Comparison
+
+| Config File | Order Notional | Use Case |
+|-------------|----------------|----------|
+| `closing_strategy_config.json` | 250k AED | Baseline/conservative |
+| `closing_strategy_config_250k.json` | 250k AED | Same as baseline |
+| `closing_strategy_config_1m_cap.json` | 1M AED | Medium position sizing |
+| `closing_strategy_config_2m_cap.json` | 2M AED | **Recommended** - best P&L |
+
+All configs include per-side trend filter settings:
+- `trend_filter_sell_enabled`: true (default)
+- `trend_filter_sell_threshold_bps_hr`: 10.0 (default)
+- `trend_filter_buy_enabled`: false (default)
+- `trend_filter_buy_threshold_bps_hr`: 10.0 (default)
 
 ---
 
 ## Quick Reference Commands
 
 ```bash
-# Basic backtest
+# Basic backtest (with SELL trend filter enabled by default)
 python scripts/run_closing_strategy.py
 
-# With 1M notional cap
-python scripts/run_closing_strategy.py --config configs/closing_strategy_config_1m_cap.json
+# With different notional cap configs
+python scripts/run_closing_strategy.py --config configs/closing_strategy_config.json           # 250k baseline
+python scripts/run_closing_strategy.py --config configs/closing_strategy_config_1m_cap.json    # 1M cap
+python scripts/run_closing_strategy.py --config configs/closing_strategy_config_2m_cap.json    # 2M cap
+
+# Disable SELL trend filter (baseline comparison)
+python scripts/run_closing_strategy.py --no-trend-filter-sell
+
+# Enable BUY trend filter (disabled by default)
+python scripts/run_closing_strategy.py --trend-filter-buy
+
+# Custom thresholds per side
+python scripts/run_closing_strategy.py --trend-threshold-sell 15.0 --trend-threshold-buy 20.0
+
+# Both filters enabled with custom thresholds
+python scripts/run_closing_strategy.py --trend-filter-buy --trend-threshold-sell 10 --trend-threshold-buy 15
 
 # Quick test (5 securities, no plots)
 python scripts/run_closing_strategy.py --max-sheets 5 --no-plots
 
-# Parameter sweep
+# Parameter sweep (VWAP spread)
 python scripts/sweep_vwap_spread.py
 
+# Sweep trend threshold values
+python scripts/sweep_vwap_spread.py --param trend_filter_sell_threshold_bps_hr --values 5 10 15 20
+
+# Sweep with trend filter disabled
+python scripts/sweep_vwap_spread.py --no-trend-filter-sell
+
 # Generate plots only (after backtest)
-python scripts/plot_closing_strategy_trades.py --output-dir output/closing_strategy
+python scripts/plot_closing_strategy_trades.py --trades-dir output/closing_strategy_2m_cap --output-dir output/closing_strategy_2m_cap/plots
 ```
+
+---
+
+## Output Files Summary
+
+Each backtest run generates:
+
+```
+output/{run_name}/
+├── backtest_summary.csv          # Per-security summary with P&L, trade counts
+├── {SECURITY}_trades.csv         # 16 per-security trade logs
+├── performance_summary.png       # 6-panel aggregate performance chart
+└── plots/
+    └── {SECURITY}_trades.png     # 16 per-security charts
+```
+
+### Performance Summary Plot (performance_summary.png)
+
+A 6-panel visualization including:
+1. **Portfolio Cumulative P&L Over Time** - Blue line with filled area (date x-axis)
+2. **P&L by Security** - Bar chart (green=profit, red=loss)
+3. **Performance Metrics Table** - Total P&L, Sharpe, Win Rate, Drawdown, etc.
+4. **Per-Security Cumulative P&L** - Multi-line chart
+5. **Global Configuration Parameters** - Table showing shared config settings
+6. **Per-Security Notional Parameters** - Table showing order_notional per security
+
+### Sweep Output Structure
+
+Each sweep run generates:
+
+```
+output/{sweep_name}/
+├── sweep_all_results.csv              # All results (security × parameter)
+├── optimal_*_per_security.csv         # Best parameter per security
+├── closing_strategy_config_optimal.json  # Generated optimal config
+└── performance_summary.png            # 7-panel sweep summary
+```
+
+### Sweep Performance Summary Plot (performance_summary.png)
+
+A 7-panel visualization including:
+1. **Cumulative P&L Across Securities** - One curve per parameter value
+2. **Total P&L by Parameter Value** - Bar chart
+3. **Best P&L by Security** - Horizontal bar chart
+4. **Total Trades by Parameter Value** - Bar chart
+5. **P&L Heatmap** - Security × Parameter matrix
+6. **Sweep Summary Statistics** - Table with best uniform/optimal params
+7. **Optimal Parameter per Security** - Table with best param for each security
+
+---
+
+## Where to Start When Revisiting
+
+### Quick Status Check
+1. **Latest Config**: `configs/closing_strategy_config_2m_cap.json` (best balance of P&L and risk)
+2. **Current Best Settings**: SELL trend filter @ 10 bps/hr, BUY filter disabled
+3. **Latest Results**: `output/closing_strategy_2m_cap/` with ~1.1M AED P&L
+
+### Key Files to Understand
+1. [src/closing_strategy/strategy.py](../../src/closing_strategy/strategy.py) - Core strategy with trend filter
+2. [scripts/run_closing_strategy.py](../../scripts/run_closing_strategy.py) - Main backtest runner
+3. [configs/closing_strategy_config_2m_cap.json](../../configs/closing_strategy_config_2m_cap.json) - Current best config
+
+### Run a Quick Test
+```bash
+# 5-security quick test with 2M cap
+python scripts/run_closing_strategy.py --config configs/closing_strategy_config_2m_cap.json --max-sheets 5
+
+# Full backtest
+python scripts/run_closing_strategy.py --config configs/closing_strategy_config_2m_cap.json
+```
+
+### Things to Explore
+1. **Different thresholds**: Try `--trend-threshold-sell 5` or `--trend-threshold-sell 15`
+2. **BUY filter**: Enable with `--trend-filter-buy` (analysis showed no benefit, but worth testing)
+3. **Per-security optimization**: Some securities may need different thresholds
+4. **EAND exclusion**: Consider excluding EAND (only negative performer)

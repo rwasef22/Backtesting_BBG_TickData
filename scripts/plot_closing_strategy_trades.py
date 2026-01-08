@@ -205,11 +205,287 @@ def plot_security_continuous(
     return output_path
 
 
+def generate_summary_plot(trades_dir: str, output_dir: str, config: dict = None):
+    """
+    Generate a summary plot with:
+    - Panel 1: Cumulative P&L over time (all securities combined)
+    - Panel 2: P&L by security bar chart
+    - Panel 3: Performance metrics table
+    - Panel 4: Cumulative P&L by security
+    - Panel 5: Configuration parameters table (per-security)
+    - Panel 6: Global parameters table
+    """
+    # Load all trade files
+    all_trades = []
+    security_pnl = {}
+    
+    for f in os.listdir(trades_dir):
+        if f.endswith('_trades.csv') and not f.startswith('backtest'):
+            security = f.replace('_trades.csv', '')
+            trades_path = os.path.join(trades_dir, f)
+            
+            try:
+                df = pd.read_csv(trades_path)
+                if len(df) == 0:
+                    continue
+                df['timestamp'] = pd.to_datetime(df['timestamp'])
+                df['security'] = security
+                all_trades.append(df)
+                
+                # Calculate final P&L for this security
+                security_pnl[security] = df['realized_pnl'].sum()
+            except Exception as e:
+                print(f"  ⚠ Error loading {f}: {e}")
+                continue
+    
+    if not all_trades:
+        print("  No trades to generate summary plot")
+        return
+    
+    # Combine all trades
+    combined = pd.concat(all_trades, ignore_index=True)
+    combined = combined.sort_values('timestamp')
+    combined['portfolio_cumulative_pnl'] = combined['realized_pnl'].cumsum()
+    
+    # Calculate performance metrics
+    total_pnl = combined['realized_pnl'].sum()
+    total_trades = len(combined)
+    entry_trades = len(combined[combined['trade_type'].str.contains('ENTRY', na=False)])
+    exit_trades = len(combined[combined['trade_type'].str.contains('EXIT', na=False)])
+    
+    # Win rate
+    wins = len(combined[combined['realized_pnl'] > 0])
+    losses = len(combined[combined['realized_pnl'] < 0])
+    win_rate = (wins / (wins + losses) * 100) if (wins + losses) > 0 else 0
+    
+    # Calculate returns for Sharpe
+    daily_pnl = combined.groupby(combined['timestamp'].dt.date)['realized_pnl'].sum()
+    avg_daily_return = daily_pnl.mean()
+    std_daily_return = daily_pnl.std()
+    sharpe = (avg_daily_return / std_daily_return * np.sqrt(252)) if std_daily_return > 0 else 0
+    
+    # Drawdown
+    running_max = combined['portfolio_cumulative_pnl'].cummax()
+    drawdown = combined['portfolio_cumulative_pnl'] - running_max
+    max_drawdown = drawdown.min()
+    max_drawdown_pct = (max_drawdown / running_max.max() * 100) if running_max.max() > 0 else 0
+    
+    # Create figure - 3 rows x 2 cols for 6 panels
+    fig = plt.figure(figsize=(18, 16))
+    
+    # Panel 1: Cumulative P&L over time
+    ax1 = fig.add_subplot(3, 2, 1)
+    ax1.plot(combined['timestamp'], combined['portfolio_cumulative_pnl'] / 1000, 
+             color='blue', linewidth=1.5, alpha=0.8)
+    ax1.fill_between(combined['timestamp'], 0, combined['portfolio_cumulative_pnl'] / 1000,
+                     alpha=0.3, color='blue')
+    ax1.set_title('Portfolio Cumulative P&L Over Time', fontsize=12, fontweight='bold')
+    ax1.set_xlabel('Date')
+    ax1.set_ylabel('Cumulative P&L (K AED)')
+    ax1.grid(True, alpha=0.3)
+    ax1.tick_params(axis='x', rotation=45)
+    
+    # Panel 2: P&L by security bar chart
+    ax2 = fig.add_subplot(3, 2, 2)
+    securities = sorted(security_pnl.keys())
+    pnl_values = [security_pnl[s] / 1000 for s in securities]
+    colors = ['green' if p >= 0 else 'red' for p in pnl_values]
+    bars = ax2.bar(securities, pnl_values, color=colors, alpha=0.7, edgecolor='black')
+    ax2.set_title('P&L by Security', fontsize=12, fontweight='bold')
+    ax2.set_xlabel('Security')
+    ax2.set_ylabel('P&L (K AED)')
+    ax2.tick_params(axis='x', rotation=45)
+    ax2.axhline(y=0, color='black', linewidth=0.5)
+    ax2.grid(True, alpha=0.3, axis='y')
+    
+    # Add value labels on bars
+    for bar, val in zip(bars, pnl_values):
+        height = bar.get_height()
+        ax2.annotate(f'{val:.0f}K',
+                    xy=(bar.get_x() + bar.get_width() / 2, height),
+                    xytext=(0, 3 if height >= 0 else -10),
+                    textcoords="offset points",
+                    ha='center', va='bottom' if height >= 0 else 'top',
+                    fontsize=8)
+    
+    # Panel 3: Performance metrics table
+    ax3 = fig.add_subplot(3, 2, 3)
+    ax3.axis('off')
+    
+    metrics_data = [
+        ['Total P&L', f'{total_pnl:,.0f} AED'],
+        ['Total Trades', f'{total_trades:,}'],
+        ['Entry Trades', f'{entry_trades:,}'],
+        ['Exit Trades', f'{exit_trades:,}'],
+        ['Win Rate', f'{win_rate:.1f}%'],
+        ['Sharpe Ratio', f'{sharpe:.2f}'],
+        ['Max Drawdown', f'{max_drawdown:,.0f} AED'],
+        ['Max Drawdown %', f'{max_drawdown_pct:.1f}%'],
+        ['Trading Days', f'{len(daily_pnl)}'],
+        ['Avg Daily P&L', f'{avg_daily_return:,.0f} AED'],
+    ]
+    
+    table = ax3.table(
+        cellText=metrics_data,
+        colLabels=['Metric', 'Value'],
+        loc='center',
+        cellLoc='left',
+        colWidths=[0.4, 0.4]
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(11)
+    table.scale(1.2, 1.8)
+    
+    # Style header row
+    for i in range(2):
+        table[(0, i)].set_facecolor('#4472C4')
+        table[(0, i)].set_text_props(color='white', fontweight='bold')
+    
+    # Alternate row colors
+    for i in range(1, len(metrics_data) + 1):
+        for j in range(2):
+            if i % 2 == 0:
+                table[(i, j)].set_facecolor('#E6F0FF')
+    
+    ax3.set_title('Performance Metrics', fontsize=12, fontweight='bold', pad=20)
+    
+    # Panel 4: P&L per security cumulative
+    ax4 = fig.add_subplot(3, 2, 4)
+    
+    colors_map = plt.cm.tab20(np.linspace(0, 1, len(securities)))
+    for i, (trades_df, sec) in enumerate(zip(all_trades, [df['security'].iloc[0] for df in all_trades])):
+        trades_sorted = trades_df.sort_values('timestamp')
+        trades_sorted['sec_cumulative_pnl'] = trades_sorted['realized_pnl'].cumsum()
+        ax4.plot(trades_sorted['timestamp'], trades_sorted['sec_cumulative_pnl'] / 1000,
+                label=sec, color=colors_map[i % len(colors_map)], alpha=0.7, linewidth=1)
+    
+    ax4.set_title('Cumulative P&L by Security', fontsize=12, fontweight='bold')
+    ax4.set_xlabel('Date')
+    ax4.set_ylabel('Cumulative P&L (K AED)')
+    ax4.legend(loc='upper left', ncol=4, fontsize=7)
+    ax4.grid(True, alpha=0.3)
+    ax4.tick_params(axis='x', rotation=45)
+    
+    # Panel 5: Global Parameters (if config provided)
+    ax5 = fig.add_subplot(3, 2, 5)
+    ax5.axis('off')
+    
+    if config and len(config) > 0:
+        # Extract global parameters from first security config
+        first_sec = list(config.keys())[0]
+        first_config = config[first_sec]
+        
+        global_params = [
+            ['VWAP Period (min)', str(first_config.get('vwap_preclose_period_min', 15))],
+            ['Spread VWAP (%)', str(first_config.get('spread_vwap_pct', 0.5))],
+            ['Stop Loss (%)', str(first_config.get('stop_loss_threshold_pct', 2.0))],
+            ['SELL Filter Enabled', str(first_config.get('trend_filter_sell_enabled', True))],
+            ['SELL Threshold (bps/hr)', str(first_config.get('trend_filter_sell_threshold_bps_hr', 10.0))],
+            ['BUY Filter Enabled', str(first_config.get('trend_filter_buy_enabled', False))],
+            ['BUY Threshold (bps/hr)', str(first_config.get('trend_filter_buy_threshold_bps_hr', 10.0))],
+        ]
+        
+        table5 = ax5.table(
+            cellText=global_params,
+            colLabels=['Parameter', 'Value'],
+            loc='center',
+            cellLoc='left',
+            colWidths=[0.5, 0.3]
+        )
+        table5.auto_set_font_size(False)
+        table5.set_fontsize(11)
+        table5.scale(1.2, 1.8)
+        
+        for i in range(2):
+            table5[(0, i)].set_facecolor('#70AD47')
+            table5[(0, i)].set_text_props(color='white', fontweight='bold')
+        
+        for i in range(1, len(global_params) + 1):
+            for j in range(2):
+                if i % 2 == 0:
+                    table5[(i, j)].set_facecolor('#E2EFDA')
+        
+        ax5.set_title('Global Strategy Parameters', fontsize=12, fontweight='bold', pad=20)
+    else:
+        ax5.text(0.5, 0.5, 'No config file provided\nUse --config to include parameters', 
+                ha='center', va='center', fontsize=12, color='gray')
+        ax5.set_title('Global Strategy Parameters', fontsize=12, fontweight='bold', pad=20)
+    
+    # Panel 6: Per-Security Configuration (notional sizes)
+    ax6 = fig.add_subplot(3, 2, 6)
+    ax6.axis('off')
+    
+    if config and len(config) > 0:
+        # Build per-security table with notional values
+        sec_config_data = []
+        for sec in sorted(config.keys()):
+            sec_cfg = config[sec]
+            notional = sec_cfg.get('order_notional', 250000)
+            notional_str = f'{notional/1000:.0f}K' if notional >= 1000 else str(notional)
+            sec_config_data.append([sec, notional_str])
+        
+        # Split into two columns for better display
+        n_rows = (len(sec_config_data) + 1) // 2
+        left_data = sec_config_data[:n_rows]
+        right_data = sec_config_data[n_rows:] if len(sec_config_data) > n_rows else []
+        
+        # Pad right data if needed
+        while len(right_data) < len(left_data):
+            right_data.append(['', ''])
+        
+        # Combine into 4-column table
+        combined_data = []
+        for i in range(len(left_data)):
+            row = [left_data[i][0], left_data[i][1]]
+            if i < len(right_data):
+                row.extend([right_data[i][0], right_data[i][1]])
+            else:
+                row.extend(['', ''])
+            combined_data.append(row)
+        
+        table6 = ax6.table(
+            cellText=combined_data,
+            colLabels=['Security', 'Notional', 'Security', 'Notional'],
+            loc='center',
+            cellLoc='center',
+            colWidths=[0.25, 0.2, 0.25, 0.2]
+        )
+        table6.auto_set_font_size(False)
+        table6.set_fontsize(9)
+        table6.scale(1.1, 1.5)
+        
+        for i in range(4):
+            table6[(0, i)].set_facecolor('#ED7D31')
+            table6[(0, i)].set_text_props(color='white', fontweight='bold')
+        
+        for i in range(1, len(combined_data) + 1):
+            for j in range(4):
+                if i % 2 == 0:
+                    table6[(i, j)].set_facecolor('#FCE4D6')
+        
+        ax6.set_title('Per-Security Order Notional (AED)', fontsize=12, fontweight='bold', pad=20)
+    else:
+        ax6.text(0.5, 0.5, 'No config file provided\nUse --config to include parameters', 
+                ha='center', va='center', fontsize=12, color='gray')
+        ax6.set_title('Per-Security Order Notional', fontsize=12, fontweight='bold', pad=20)
+    
+    plt.suptitle('Closing Strategy - Performance Summary', fontsize=14, fontweight='bold', y=1.01)
+    plt.tight_layout()
+    
+    # Save
+    summary_path = os.path.join(output_dir, 'performance_summary.png')
+    plt.savefig(summary_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    
+    print(f"  ✓ Saved: performance_summary.png")
+
+
 def generate_all_plots(
     parquet_dir: str,
     trades_dir: str,
     output_dir: str,
-    securities: list = None
+    securities: list = None,
+    config: dict = None
 ):
     """
     Generate plots for all securities.
@@ -219,6 +495,7 @@ def generate_all_plots(
         trades_dir: Directory with strategy trade CSVs
         output_dir: Output directory for plots
         securities: List of securities to plot (None = all)
+        config: Strategy configuration dict for parameter display
     """
     os.makedirs(output_dir, exist_ok=True)
     
@@ -257,6 +534,9 @@ def generate_all_plots(
         else:
             print(f"  ⚠ {security}: No data to plot")
     
+    # Generate summary plot
+    generate_summary_plot(trades_dir, output_dir, config)
+    
     print(f"\nPlots saved to {output_dir}")
 
 
@@ -281,6 +561,10 @@ def main():
         default='output/closing_strategy/plots',
         help='Output directory for plots'
     )
+    parser.add_argument(
+        '--config',
+        help='Path to config JSON file (for parameter display in summary plot)'
+    )
     
     args = parser.parse_args()
     
@@ -292,13 +576,26 @@ def main():
     if not os.path.isabs(args.output_dir):
         args.output_dir = os.path.join(PROJECT_ROOT, args.output_dir)
     
+    # Load config if provided
+    config = None
+    if args.config:
+        config_path = args.config
+        if not os.path.isabs(config_path):
+            config_path = os.path.join(PROJECT_ROOT, config_path)
+        
+        import json
+        with open(config_path) as f:
+            config = json.load(f)
+        print(f"Loaded config from {config_path}")
+    
     securities = [args.security] if args.security else None
     
     generate_all_plots(
         parquet_dir=args.parquet_dir,
         trades_dir=args.trades_dir,
         output_dir=args.output_dir,
-        securities=securities
+        securities=securities,
+        config=config
     )
 
 

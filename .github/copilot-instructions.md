@@ -1,5 +1,36 @@
 # Tick Backtest Project - AI Coding Agent Instructions
 
+## Quick Start Guide (When Revisiting)
+
+### Two Strategies Available
+
+1. **Market-Making Strategy** (Regular Trading Hours 10:00-14:45)
+   - Best version: `v2_1_stop_loss` @ 5s interval
+   - P&L: ~1.41M AED, Sharpe: 15.0
+   - Run: `python scripts/run_parquet_backtest.py --strategy v2_1_stop_loss`
+
+2. **Closing Strategy** (Auction Period 14:45-15:00)
+   - Best config: `closing_strategy_config_2m_cap.json`
+   - P&L: ~1.1M AED, Sharpe: 5.48
+   - Run: `python scripts/run_closing_strategy.py --config configs/closing_strategy_config_2m_cap.json`
+
+### Quick Test Commands
+
+```bash
+# Market-making (5 securities, quick test)
+python scripts/run_parquet_backtest.py --strategy v2_1_stop_loss --max-sheets 5
+
+# Closing strategy (5 securities, quick test)
+python scripts/run_closing_strategy.py --config configs/closing_strategy_config_2m_cap.json --max-sheets 5
+```
+
+### Key Documentation
+- **This file**: Architecture overview and strategy status
+- **Market-making**: `docs/strategies/v2_1_stop_loss/README.md`
+- **Closing strategy**: `docs/closing_strategy/README.md`
+
+---
+
 ## Project Overview
 
 This is a **market-making strategy backtesting framework** for simulating trading strategies on historical tick data. It uses a **streaming architecture** to process 670k+ row Excel datasets efficiently via chunked processing (100k rows/chunk). The framework supports multiple strategy variations with clean separation, realistic FIFO queue fill simulation, and comprehensive performance comparison tools.
@@ -34,12 +65,22 @@ Strategies maintain per-security state across chunks:
 
 ## Strategy Status (Current as of Jan 2026)
 
+### Market-Making Strategies (Regular Hours)
+
 | Strategy | Status | P&L | Sharpe | Best Interval |
 |----------|--------|-----|--------|---------------|
 | `v1_baseline` | Reference | 697k AED | 12.7 | 180s |
 | `v2_price_follow_qty_cooldown` | Good | 1.32M AED | 14.2 | 5s |
 | **`v2_1_stop_loss`** | **BEST**  | **1.41M AED** | **15.0** | **5s** |
 | `v3_liquidity_monitor` | ABANDONED | 400k AED | 8.5 | - |
+
+### Closing Strategy (Auction Period)
+
+| Config | P&L | Trades | Sharpe | Filtered SELL |
+|--------|-----|--------|--------|---------------|
+| 250k Baseline | 1,268k AED | 8,828 | ~5.5 | 624 |
+| 1M Cap | ~800k AED | ~8,500 | ~5.0 | ~620 |
+| **2M Cap** | **1,103k AED** | **8,519** | **5.48** | **624** |
 
 ### V2.1 Stop-Loss Strategy (RECOMMENDED)
 
@@ -188,12 +229,25 @@ output/
  v2_1_stop_loss/                 # Per-strategy results
     {security}_trades.csv       # Per-security trade log
     backtest_summary.csv        # Aggregate metrics
+    performance_summary.csv     # Comprehensive stats (Sharpe, drawdown, etc.)
  sweep_v2_v21/                   # Sweep results
     sweep_results.csv
+    performance_summary.csv     # Stats per scenario
     cumulative_pnl_by_strategy.png
     v2_5s/, v2_1_5s/, etc.
  comparison/
 ```
+
+## Performance Summary CSV
+
+Automatically generated after backtests and sweeps with these fields:
+- `total_trades`, `entry_trades`, `exit_trades`
+- `total_pnl`, `avg_return_per_trade`
+- `sharpe_ratio` (annualized)
+- `max_drawdown`, `max_drawdown_pct`
+- `calmar_ratio`, `win_rate`, `profit_factor`
+- `avg_win`, `avg_loss`, `largest_win`, `largest_loss`
+- `trading_days`, `trades_per_day`
 
 ## Key Scripts Reference
 
@@ -206,6 +260,43 @@ output/
 | `comprehensive_sweep.py` | Full V1/V2 sweep | `--intervals 10 30 60 120 300` |
 | `convert_excel_to_parquet.py` | Data conversion | (one-time) |
 | `compare_strategies.py` | Compare results | `v1_baseline v2_1_stop_loss` |
+| `run_closing_strategy.py` | Closing auction strategy | `--config configs/closing_strategy_config_2m_cap.json` |
+| `sweep_vwap_spread.py` | Closing strategy sweep | `--param spread_vwap_pct --values 0.25 0.5 0.75` |
+| `plot_closing_strategy_trades.py` | Generate closing strategy plots | `--trades-dir output/closing_strategy_2m_cap` |
+| `generate_sweep_summary.py` | Generate sweep summary plots | (auto or `--all`) |
+
+## Plotting Scripts Reference
+
+### Closing Strategy Backtest Plots (`plot_closing_strategy_trades.py`)
+
+Generates per-security trade charts and aggregate performance summary.
+
+```bash
+# Generate all plots for a backtest run
+python scripts/plot_closing_strategy_trades.py --trades-dir output/closing_strategy_2m_cap --config configs/closing_strategy_config_2m_cap.json
+
+# Generate plots only (no individual security charts)
+python scripts/plot_closing_strategy_trades.py --trades-dir output/closing_strategy_2m_cap --summary-only
+```
+
+**Output:** `performance_summary.png` (6 panels) + `plots/{SECURITY}_trades.png` (16 files)
+
+### Sweep Summary Plots (`generate_sweep_summary.py`)
+
+Generates performance summary for parameter sweep results.
+
+```bash
+# Generate for all sweep folders
+python scripts/generate_sweep_summary.py
+
+# Generate for specific sweep folder
+python scripts/generate_sweep_summary.py --sweep-dir output/vwap_spread_sweep
+```
+
+**Output:** `performance_summary.png` (7 panels) with:
+- Cumulative P&L across securities (one curve per parameter)
+- Total P&L by parameter, P&L heatmap
+- Optimal parameters per security
 
 ## Key Documentation Files
 
@@ -213,6 +304,7 @@ output/
 - `docs/SCRIPTS_REFERENCE.md` - Detailed script documentation
 - `docs/strategies/v2_1_stop_loss/` - V2.1 strategy docs
 - `docs/strategies/v2_price_follow_qty_cooldown/` - V2 strategy docs
+- `docs/closing_strategy/README.md` - Closing strategy comprehensive docs
 - `FILL_REFILL_LOGIC_EXPLAINED.md` - Quote/fill mechanics
 - `MULTI_STRATEGY_GUIDE.md` - Architecture guide
 - `PARQUET_GUIDE.md` - Data format optimization
@@ -248,3 +340,214 @@ V2.1        10s       277,624     1,365,515.77  14.80
 ```
 
 **Key Finding**: V2.1 @ 5s is the optimal configuration with +89,716 AED higher P&L than V2 and better risk-adjusted returns.
+
+---
+
+## Closing Strategy (Auction-Based)
+
+### Overview
+
+The **Closing Strategy** is a separate strategy module that trades during the closing auction period (14:45-15:00). Unlike the main market-making strategies that operate during regular trading hours, this strategy:
+- Enters positions during the closing auction window
+- Uses VWAP deviation for entry signals
+- Exits at the official closing price
+
+### Architecture
+
+```
+src/closing_strategy/
+├── strategy.py       # Core strategy logic with trend filter
+├── handler.py        # Processes tick data, bridges strategy with backtest
+├── __init__.py
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/closing_strategy/strategy.py` | Core strategy class with VWAP logic, trend filter |
+| `src/closing_strategy/handler.py` | Handler function for backtest framework |
+| `scripts/run_closing_strategy.py` | Main backtest runner with CLI options |
+| `scripts/sweep_vwap_spread.py` | Parameter sweep for VWAP spread thresholds |
+| `configs/closing_strategy_config.json` | Per-security configuration |
+
+### Trend Filter (Per-Side Entry Protection)
+
+Based on comprehensive trade analysis (p=0.0017), a **trend exclusion filter** protects against entries in adverse market conditions. Each side (BUY/SELL) has independent enable flags and thresholds.
+
+**Analysis Finding:**
+- SELL entries in uptrends (>10 bps/hr slope) have only **65% win rate**
+- SELL entries in downtrends have **86% win rate**
+- Filter avoids ~126 losing trades and estimated **210,000 AED** in losses
+
+**Implementation:**
+```python
+# Linear regression on (hours_since_10am, price) during regular trading hours
+# SELL filtered if trend_slope > sell_threshold (uptrend)
+# BUY filtered if trend_slope < -buy_threshold (downtrend)
+
+trend_filter_sell_enabled: bool = True           # Default: enabled
+trend_filter_sell_threshold_bps_hr: float = 10.0 # Skip SELL if uptrend > threshold
+trend_filter_buy_enabled: bool = False           # Default: disabled
+trend_filter_buy_threshold_bps_hr: float = 10.0  # Skip BUY if downtrend < -threshold
+```
+
+**Filter Logic:**
+1. During regular hours (10:00-14:45), collect (time, price) data points
+2. At auction time, calculate daily trend slope via linear regression
+3. If `slope > sell_threshold` AND `sell_filter_enabled`: skip SELL entry
+4. If `slope < -buy_threshold` AND `buy_filter_enabled`: skip BUY entry
+
+### Running Closing Strategy
+
+**Basic Run:**
+```bash
+python scripts/run_closing_strategy.py
+python scripts/run_closing_strategy.py --max-sheets 5  # Quick test
+```
+
+**With Trend Filter Control (Per-Side):**
+```bash
+# Default: SELL filter enabled at 10 bps/hr, BUY filter disabled
+python scripts/run_closing_strategy.py
+
+# Disable SELL trend filter
+python scripts/run_closing_strategy.py --no-trend-filter-sell
+
+# Enable BUY trend filter (filter BUY in downtrends)
+python scripts/run_closing_strategy.py --trend-filter-buy
+
+# Custom thresholds per side
+python scripts/run_closing_strategy.py --trend-threshold-sell 15.0 --trend-threshold-buy 20.0
+
+# Enable both filters with custom thresholds
+python scripts/run_closing_strategy.py --trend-filter-buy --trend-threshold-sell 10 --trend-threshold-buy 15
+
+# Use 2M cap config with SELL filter only
+python scripts/run_closing_strategy.py --config configs/closing_strategy_config_2m_cap.json
+```
+
+**Parameter Sweep:**
+```bash
+# Sweep VWAP spread thresholds
+python scripts/sweep_vwap_spread.py
+
+# Sweep with trend filter disabled
+python scripts/sweep_vwap_spread.py --no-trend-filter
+
+# Sweep trend threshold values
+python scripts/sweep_vwap_spread.py --param trend_filter_sell_threshold_bps_hr --values 5 10 15 20
+```
+
+### Configuration Parameters
+
+```json
+{
+  "ADNOCGAS": {
+    "vwap_preclose_period_min": 15,
+    "spread_vwap_pct": 0.5,
+    "order_notional": 1000000,
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
+  }
+}
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `vwap_preclose_period_min` | int | 15 | Minutes before 14:45 to calculate VWAP |
+| `spread_vwap_pct` | float | 0.5 | Spread around VWAP for orders (%) |
+| `order_notional` | int | 250000 | Order size in AED |
+| `stop_loss_threshold_pct` | float | 2.0 | Stop-loss trigger (%) |
+| `trend_filter_sell_enabled` | bool | true | Filter SELL entries in uptrends |
+| `trend_filter_sell_threshold_bps_hr` | float | 10.0 | SELL filter threshold (bps/hour) |
+| `trend_filter_buy_enabled` | bool | false | Filter BUY entries in downtrends |
+| `trend_filter_buy_threshold_bps_hr` | float | 10.0 | BUY filter threshold (bps/hour) |
+
+### Output Fields
+
+The closing strategy summary includes:
+- `total_trades`, `buy_entries`, `sell_entries`
+- `filtered_sell_entries` - Count of SELL entries blocked by trend filter
+- `filtered_buy_entries` - Count of BUY entries blocked by trend filter  
+- `total_pnl`, `win_rate`
+- Per-security breakdowns
+
+### Output Structure
+
+Each backtest run generates:
+```
+output/{run_name}/
+├── backtest_summary.csv          # Per-security metrics
+├── {SECURITY}_trades.csv         # 16 trade logs
+├── performance_summary.png       # 6-panel aggregate chart (includes config params)
+└── plots/
+    └── {SECURITY}_trades.png     # 16 per-security charts
+```
+
+### Sweep Output Structure
+
+Each sweep run generates:
+```
+output/{sweep_name}/
+├── sweep_all_results.csv              # All results (security × parameter)
+├── optimal_*_per_security.csv         # Best parameter per security
+├── closing_strategy_config_optimal.json  # Generated optimal config
+└── performance_summary.png            # 7-panel sweep summary
+```
+
+### Performance Summary Plots
+
+**Backtest Performance Summary (6 panels):**
+1. Cumulative P&L Over Time (date x-axis)
+2. P&L by Security (bar chart)
+3. Performance Metrics Table
+4. Per-Security Cumulative P&L
+5. Global Configuration Parameters
+6. Per-Security Notional Parameters
+
+**Sweep Performance Summary (7 panels):**
+1. Cumulative P&L Across Securities (one curve per parameter value)
+2. Total P&L by Parameter Value
+3. Best P&L by Security
+4. Total Trades by Parameter Value
+5. P&L Heatmap (Security × Parameter)
+6. Sweep Summary Statistics
+7. Optimal Parameter per Security Table
+
+### Trading Windows
+
+- **Regular Hours (data collection)**: 10:00:00 - 14:44:59
+- **Closing Auction (trading)**: 14:45:00 - 14:59:59
+- **Daily Reset**: Positions closed at auction, state reset on new day
+
+### Latest Results (Jan 8, 2026)
+
+| Config | P&L (AED) | Trades | Filtered SELL | Sharpe |
+|--------|-----------|--------|---------------|--------|
+| **250k Baseline** | 1,268,317 | 8,828 | 624 | ~5.5 |
+| 1M Cap | ~800,000 | ~8,500 | ~620 | ~5.0 |
+| **2M Cap** | 1,103,485 | 8,519 | 624 | 5.48 |
+
+**Recommended**: 2M cap config with SELL filter at 10 bps/hr
+
+### Where to Start
+
+**Quick Test:**
+```bash
+python scripts/run_closing_strategy.py --config configs/closing_strategy_config_2m_cap.json --max-sheets 5
+```
+
+**Full Run:**
+```bash
+python scripts/run_closing_strategy.py --config configs/closing_strategy_config_2m_cap.json
+```
+
+**Key Files:**
+- Strategy: `src/closing_strategy/strategy.py`
+- Runner: `scripts/run_closing_strategy.py`
+- Config: `configs/closing_strategy_config_2m_cap.json`
+- Docs: `docs/closing_strategy/README.md`

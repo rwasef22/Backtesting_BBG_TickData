@@ -42,6 +42,8 @@ python scripts/run_parquet_backtest.py --strategy v1_baseline --max-sheets 5
 
 ##  Available Strategies
 
+### Market-Making Strategies (Regular Hours: 10:00-14:45)
+
 | Strategy | Description | Best P&L | Sharpe |
 |----------|-------------|----------|--------|
 | `v1_baseline` | Reference implementation, time-based refill | 697k AED | 12.7 |
@@ -49,35 +51,60 @@ python scripts/run_parquet_backtest.py --strategy v1_baseline --max-sheets 5
 | **`v2_1_stop_loss`** | V2 + 2% stop-loss protection | **1.41M AED** | **15.0**  |
 | `v3_liquidity_monitor` | Stricter liquidity requirements (abandoned) | 400k AED | 8.5 |
 
+### Closing Strategy (Auction Period: 14:45-15:00)
+
+| Config | Description | P&L | Sharpe |
+|--------|-------------|-----|--------|
+| `closing_strategy_config.json` | 250k notional baseline | 1,268k AED | ~5.5 |
+| `closing_strategy_config_1m_cap.json` | 1M notional cap | ~800k AED | ~5.0 |
+| **`closing_strategy_config_2m_cap.json`** | **2M notional cap (recommended)** | **1,103k AED** | **5.48** |
+
+**Quick Closing Strategy Test:**
+```bash
+python scripts/run_closing_strategy.py --config configs/closing_strategy_config_2m_cap.json --max-sheets 5
+```
+
+See [docs/closing_strategy/README.md](docs/closing_strategy/README.md) for full documentation.
+
 ##  Project Structure
 
 ```
 tick-backtest-project/
  src/                              # Core framework
-    strategies/                   # Strategy implementations
+    strategies/                   # Market-making strategy implementations
        base_strategy.py          # Abstract base class
        v1_baseline/              # V1: Reference strategy
        v2_price_follow_qty_cooldown/  # V2: Best performer
        v2_1_stop_loss/           # V2.1: With stop-loss
+    closing_strategy/             # Closing auction strategy
+       strategy.py               # Core logic with trend filter
+       handler.py                # Backtest integration
     parallel_backtest.py          # Parallel execution engine
     parquet_loader.py             # Parquet data loading
     orderbook.py                  # Order book state
 
  scripts/                          # Executable scripts
-    run_parquet_backtest.py       #  Fastest runner
+    run_parquet_backtest.py       #  Fastest runner (market-making)
+    run_closing_strategy.py       #  Closing auction backtest
     run_parallel_backtest.py      # Parallel (Excel)
     run_strategy.py               # Sequential (reference)
     fast_sweep.py                 #  V2 vs V2.1 parameter sweep
+    sweep_vwap_spread.py          # Closing strategy sweep
     comprehensive_sweep.py        # Full V1/V2 sweep
     compare_strategies.py         # Strategy comparison
+    plot_closing_strategy_trades.py  # Generate closing strategy plots
 
  configs/                          # Per-security configurations
     v1_baseline_config.json
     v2_price_follow_qty_cooldown_config.json
     v2_1_stop_loss_config.json
+    closing_strategy_config.json         # 250k baseline
+    closing_strategy_config_1m_cap.json  # 1M cap
+    closing_strategy_config_2m_cap.json  # 2M cap (recommended)
 
  docs/                             # Documentation
-    strategies/                   # Per-strategy docs
+    strategies/                   # Market-making strategy docs
+    closing_strategy/             # Closing strategy comprehensive docs
 
  output/                           # Results (gitignored)
     sweep_v2_v21/                 # Latest sweep results

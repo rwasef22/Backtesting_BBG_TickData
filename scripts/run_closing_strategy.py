@@ -8,6 +8,7 @@ A closing auction arbitrage strategy that:
 3. Executes at closing auction if price crosses order price
 4. Exits positions the next day at VWAP price
 5. Stop-loss protection (default: 2%) exits at best opposite price
+6. SELL entry trend filter (default: enabled) skips SELL in uptrends >10 bps/hr
 
 Usage:
     # Full backtest using Parquet data
@@ -24,6 +25,12 @@ Usage:
     
     # Custom stop-loss threshold
     python scripts/run_closing_strategy.py --stop-loss 3.0
+    
+    # Disable trend filter for SELL entries
+    python scripts/run_closing_strategy.py --no-trend-filter
+    
+    # Custom trend filter threshold (bps/hour)
+    python scripts/run_closing_strategy.py --trend-threshold 15.0
 
 Output:
     output/closing_strategy/
@@ -138,6 +145,10 @@ def run_closing_strategy_backtest(
     stop_loss_override: float = None,
     auction_fill_pct: float = 10.0,
     generate_plots: bool = True,
+    trend_filter_sell_enabled: bool = True,
+    trend_filter_sell_threshold: float = None,
+    trend_filter_buy_enabled: bool = False,
+    trend_filter_buy_threshold: float = None,
 ):
     """
     Run closing strategy backtest.
@@ -154,6 +165,10 @@ def run_closing_strategy_backtest(
         stop_loss_override: Override stop_loss_threshold_pct for all securities
         auction_fill_pct: Maximum fill as percentage of auction volume (default 10%)
         generate_plots: Whether to generate trade plots after backtest (default True)
+        trend_filter_sell_enabled: Enable trend filter for SELL entries (default True)
+        trend_filter_sell_threshold: Override trend_filter_sell_threshold_bps_hr
+        trend_filter_buy_enabled: Enable trend filter for BUY entries (default False)
+        trend_filter_buy_threshold: Override trend_filter_buy_threshold_bps_hr
     """
     print("=" * 60)
     print("CLOSING STRATEGY BACKTEST")
@@ -175,7 +190,7 @@ def run_closing_strategy_backtest(
         print("No exchange mapping provided, using ADX defaults")
     
     # Apply overrides
-    if spread_override is not None or vwap_period_override is not None or stop_loss_override is not None:
+    if spread_override is not None or vwap_period_override is not None or stop_loss_override is not None or trend_filter_sell_threshold is not None or trend_filter_buy_threshold is not None:
         for security in config:
             if spread_override is not None:
                 config[security]['spread_vwap_pct'] = spread_override
@@ -183,6 +198,15 @@ def run_closing_strategy_backtest(
                 config[security]['vwap_preclose_period_min'] = vwap_period_override
             if stop_loss_override is not None:
                 config[security]['stop_loss_threshold_pct'] = stop_loss_override
+            if trend_filter_sell_threshold is not None:
+                config[security]['trend_filter_sell_threshold_bps_hr'] = trend_filter_sell_threshold
+            if trend_filter_buy_threshold is not None:
+                config[security]['trend_filter_buy_threshold_bps_hr'] = trend_filter_buy_threshold
+    
+    # Apply trend filter enabled/disabled per side
+    for security in config:
+        config[security]['trend_filter_sell_enabled'] = trend_filter_sell_enabled
+        config[security]['trend_filter_buy_enabled'] = trend_filter_buy_enabled
     
     # Load data
     print(f"\nLoading data from {parquet_dir}...")
@@ -258,9 +282,13 @@ def run_closing_strategy_backtest(
             'security': result['security'],
             'total_trades': summary.get('total_trades', 0),
             'auction_entries': summary.get('auction_entries', 0),
+            'buy_entries': summary.get('buy_entries', 0),
+            'sell_entries': summary.get('sell_entries', 0),
             'vwap_exits': summary.get('vwap_exits', 0),
             'stop_losses': summary.get('stop_losses', 0),
             'eod_flattens': summary.get('eod_flattens', 0),
+            'filtered_sell_entries': summary.get('filtered_sell_entries', 0),
+            'filtered_buy_entries': summary.get('filtered_buy_entries', 0),
             'realized_pnl': result.get('pnl', 0),
             'final_position': result.get('position', 0),
         })
@@ -273,19 +301,29 @@ def run_closing_strategy_backtest(
     total_trades = sum(r.get('summary', {}).get('total_trades', 0) for r in results)
     total_pnl = sum(r.get('pnl', 0) for r in results)
     total_entries = sum(r.get('summary', {}).get('auction_entries', 0) for r in results)
+    total_buy_entries = sum(r.get('summary', {}).get('buy_entries', 0) for r in results)
+    total_sell_entries = sum(r.get('summary', {}).get('sell_entries', 0) for r in results)
     total_exits = sum(r.get('summary', {}).get('vwap_exits', 0) for r in results)
     total_stop_losses = sum(r.get('summary', {}).get('stop_losses', 0) for r in results)
     total_eod_flattens = sum(r.get('summary', {}).get('eod_flattens', 0) for r in results)
+    total_filtered_sell = sum(r.get('summary', {}).get('filtered_sell_entries', 0) for r in results)
+    total_filtered_buy = sum(r.get('summary', {}).get('filtered_buy_entries', 0) for r in results)
     
     print("\n" + "=" * 60)
     print("RESULTS")
     print("=" * 60)
     print(f"Securities processed: {len(results)}")
+    print(f"Trend filter SELL:    {'ENABLED' if trend_filter_sell_enabled else 'DISABLED'}")
+    print(f"Trend filter BUY:     {'ENABLED' if trend_filter_buy_enabled else 'DISABLED'}")
     print(f"Total trades:         {total_trades:,}")
-    print(f"  Auction entries:    {total_entries:,}")
+    print(f"  Auction entries:    {total_entries:,} (BUY: {total_buy_entries:,}, SELL: {total_sell_entries:,})")
     print(f"  VWAP exits:         {total_exits:,}")
     print(f"  Stop-losses:        {total_stop_losses:,}")
     print(f"  EOD flattens:       {total_eod_flattens:,}")
+    if trend_filter_sell_enabled:
+        print(f"  Filtered SELL:      {total_filtered_sell:,} (skipped due to uptrend)")
+    if trend_filter_buy_enabled:
+        print(f"  Filtered BUY:       {total_filtered_buy:,} (skipped due to downtrend)")
     print(f"Total P&L:            {total_pnl:,.2f} AED")
     print(f"Processing time:      {elapsed:.1f}s")
     print(f"\nOutput saved to: {output_dir}")
@@ -311,7 +349,8 @@ def run_closing_strategy_backtest(
         generate_all_plots(
             parquet_dir=parquet_dir,
             trades_dir=output_dir,
-            output_dir=plots_dir
+            output_dir=plots_dir,
+            config=config  # Pass config for parameter display
         )
     
     return {
@@ -389,6 +428,26 @@ Examples:
         action='store_true',
         help='Skip generating plots after backtest'
     )
+    parser.add_argument(
+        '--no-trend-filter-sell',
+        action='store_true',
+        help='Disable trend filter for SELL entries (default: enabled)'
+    )
+    parser.add_argument(
+        '--trend-threshold-sell',
+        type=float,
+        help='SELL trend filter threshold in bps/hour (default: 10.0). SELL entries skipped when uptrend > threshold.'
+    )
+    parser.add_argument(
+        '--trend-filter-buy',
+        action='store_true',
+        help='Enable trend filter for BUY entries (default: disabled). BUY entries skipped when downtrend < -threshold.'
+    )
+    parser.add_argument(
+        '--trend-threshold-buy',
+        type=float,
+        help='BUY trend filter threshold in bps/hour (default: 10.0). BUY entries skipped when downtrend < -threshold.'
+    )
     
     args = parser.parse_args()
     
@@ -414,6 +473,10 @@ Examples:
         stop_loss_override=args.stop_loss,
         auction_fill_pct=args.auction_fill_pct,
         generate_plots=not args.no_plots,
+        trend_filter_sell_enabled=not args.no_trend_filter_sell,
+        trend_filter_sell_threshold=args.trend_threshold_sell,
+        trend_filter_buy_enabled=args.trend_filter_buy,
+        trend_filter_buy_threshold=args.trend_threshold_buy,
     )
 
 

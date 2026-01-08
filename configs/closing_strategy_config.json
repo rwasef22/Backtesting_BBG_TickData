@@ -3,96 +3,160 @@
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
     "order_notional": 4467305,
-    "stop_loss_threshold_pct": 2.0
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
   },
   "ALDAR": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
     "order_notional": 2084496,
-    "stop_loss_threshold_pct": 2.0
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
   },
   "ADNOCDRI": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
     "order_notional": 940139,
-    "stop_loss_threshold_pct": 2.0
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
   },
   "ADNOCGAS": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
     "order_notional": 1484468,
-    "stop_loss_threshold_pct": 2.0
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
   },
   "ADNOCLS": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
     "order_notional": 330610,
-    "stop_loss_threshold_pct": 2.0
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
   },
   "ADCB": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
     "order_notional": 1873081,
-    "stop_loss_threshold_pct": 2.0
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
   },
   "ADIB": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
     "order_notional": 1374281,
-    "stop_loss_threshold_pct": 2.0
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
   },
   "FAB": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
     "order_notional": 2379148,
-    "stop_loss_threshold_pct": 2.0
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
   },
   "MULTIPLY": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
     "order_notional": 387012,
-    "stop_loss_threshold_pct": 2.0
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
   },
   "EAND": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
     "order_notional": 1799176,
-    "stop_loss_threshold_pct": 2.0
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
   },
   "EMIRATES": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
     "order_notional": 1982247,
-    "stop_loss_threshold_pct": 2.0
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
   },
   "SALIK": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
     "order_notional": 667242,
-    "stop_loss_threshold_pct": 2.0
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
   },
   "PARKIN": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
     "order_notional": 117464,
-    "stop_loss_threshold_pct": 2.0
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
   },
   "MODON": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
     "order_notional": 136052,
-    "stop_loss_threshold_pct": 2.0
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
   },
   "SPINNEYS": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
     "order_notional": 13917,
-    "stop_loss_threshold_pct": 2.0
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
   },
   "TALABAT": {
     "vwap_preclose_period_min": 15,
     "spread_vwap_pct": 0.5,
     "order_notional": 390548,
-    "stop_loss_threshold_pct": 2.0
+    "stop_loss_threshold_pct": 2.0,
+    "trend_filter_sell_enabled": true,
+    "trend_filter_sell_threshold_bps_hr": 10.0,
+    "trend_filter_buy_enabled": false,
+    "trend_filter_buy_threshold_bps_hr": 10.0
   }
 }

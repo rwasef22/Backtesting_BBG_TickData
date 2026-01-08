@@ -101,7 +101,12 @@ def create_closing_strategy_handler(config: dict, exchange_mapping: dict = None,
             # Update orderbook with bid/ask quotes
             strategy.update_orderbook(security, event_type, price)
             
-            # === Phase 0: Check Stop-Loss ===
+            # === Phase 0: Update trend data for SELL entry filter ===
+            # Track all trades during regular hours for trend calculation
+            if event_type == 'trade' and strategy.is_regular_trading_hours(timestamp):
+                strategy.update_trend_data(security, timestamp, price)
+            
+            # === Phase 0.5: Check Stop-Loss ===
             # Only during regular trading hours when we have a position
             if strategy.is_regular_trading_hours(timestamp):
                 stop_loss_trade = strategy.check_stop_loss(security, timestamp)

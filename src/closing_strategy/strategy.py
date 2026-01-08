@@ -82,7 +82,11 @@ class ClosingStrategy:
                 "vwap_preclose_period_min": 15,  # Minutes before 14:45 to calculate VWAP
                 "spread_vwap_pct": 0.5,          # Spread around VWAP (%)
                 "order_notional": 250000,         # Local currency value for orders
-                "stop_loss_threshold_pct": 2.0   # Stop-loss threshold (%)
+                "stop_loss_threshold_pct": 2.0,  # Stop-loss threshold (%)
+                "trend_filter_sell_enabled": True,     # Enable trend filter for SELL entries
+                "trend_filter_sell_threshold_bps_hr": 10.0,  # Skip SELL if uptrend > threshold
+                "trend_filter_buy_enabled": False,     # Enable trend filter for BUY entries
+                "trend_filter_buy_threshold_bps_hr": 10.0   # Skip BUY if downtrend < -threshold
             }
         }
         
@@ -114,6 +118,12 @@ class ClosingStrategy:
         
         # Auction volume tracking for execution probability
         self.auction_volume: Dict[str, int] = {}  # {security: total_auction_volume}
+        
+        # Trend tracking for entry filter
+        self.trend_data: Dict[str, List[Tuple[float, float]]] = {}  # {security: [(time_hours, price)]}
+        self.daily_trend_slope: Dict[str, float] = {}  # {security: slope_bps_per_hour}
+        self.filtered_sell_entries: Dict[str, int] = {}  # {security: count of filtered SELL entries}
+        self.filtered_buy_entries: Dict[str, int] = {}  # {security: count of filtered BUY entries}
     
     def initialize_security(self, security: str):
         """Initialize state for a security."""
@@ -131,6 +141,10 @@ class ClosingStrategy:
             self.closing_price_processed[security] = False
             self.current_date[security] = None
             self.auction_volume[security] = 0
+            self.trend_data[security] = []
+            self.daily_trend_slope[security] = 0.0
+            self.filtered_sell_entries[security] = 0
+            self.filtered_buy_entries[security] = 0
     
     def get_config(self, security: str) -> dict:
         """Get configuration for a security with defaults."""
@@ -140,6 +154,10 @@ class ClosingStrategy:
             'spread_vwap_pct': cfg.get('spread_vwap_pct', 0.5),
             'order_notional': cfg.get('order_notional', 250000),  # Local currency value for orders
             'stop_loss_threshold_pct': cfg.get('stop_loss_threshold_pct', 2.0),
+            'trend_filter_sell_enabled': cfg.get('trend_filter_sell_enabled', True),  # Filter SELL in uptrends
+            'trend_filter_sell_threshold_bps_hr': cfg.get('trend_filter_sell_threshold_bps_hr', 10.0),
+            'trend_filter_buy_enabled': cfg.get('trend_filter_buy_enabled', False),  # Filter BUY in downtrends (off by default)
+            'trend_filter_buy_threshold_bps_hr': cfg.get('trend_filter_buy_threshold_bps_hr', 10.0),
         }
     
     def get_exchange(self, security: str) -> str:
@@ -313,6 +331,117 @@ class ClosingStrategy:
         self.closing_price_processed[security] = False
         self.current_date[security] = new_date.date()
         self.auction_volume[security] = 0  # Reset auction volume for new day
+        self.trend_data[security] = []  # Reset trend data for new day
+        self.daily_trend_slope[security] = 0.0
+    
+    def update_trend_data(self, security: str, timestamp: datetime, price: float):
+        """
+        Update trend data with a trade price during regular hours.
+        Called for each trade to build trend slope calculation.
+        """
+        # Only track during regular trading hours (10:00 - 14:45)
+        if not self.is_regular_trading_hours(timestamp):
+            return
+        
+        # Convert timestamp to hours since 10:00
+        t = timestamp.time()
+        hours_since_open = (t.hour - 10) + t.minute / 60.0 + t.second / 3600.0
+        
+        if security not in self.trend_data:
+            self.trend_data[security] = []
+        
+        self.trend_data[security].append((hours_since_open, price))
+    
+    def calculate_trend_slope(self, security: str) -> float:
+        """
+        Calculate trend slope in basis points per hour using linear regression.
+        
+        Returns:
+            Slope in bps/hour (positive = uptrend, negative = downtrend)
+        """
+        data = self.trend_data.get(security, [])
+        if len(data) < 10:  # Need minimum data points
+            return 0.0
+        
+        # Simple linear regression
+        n = len(data)
+        sum_x = sum(d[0] for d in data)
+        sum_y = sum(d[1] for d in data)
+        sum_xy = sum(d[0] * d[1] for d in data)
+        sum_x2 = sum(d[0] ** 2 for d in data)
+        
+        denominator = n * sum_x2 - sum_x ** 2
+        if denominator == 0:
+            return 0.0
+        
+        # Slope in price units per hour
+        slope = (n * sum_xy - sum_x * sum_y) / denominator
+        
+        # Convert to basis points per hour (relative to mean price)
+        mean_price = sum_y / n
+        if mean_price == 0:
+            return 0.0
+        
+        slope_bps_per_hour = (slope / mean_price) * 10000
+        
+        return slope_bps_per_hour
+    
+    def should_filter_sell_entry(self, security: str) -> bool:
+        """
+        Check if SELL entry should be filtered based on trend.
+        
+        Returns True if:
+        - trend_filter_sell_enabled is True
+        - Daily trend slope exceeds trend_filter_sell_threshold_bps_hr (uptrend)
+        
+        The analysis showed SELL entries in uptrends (>10 bps/hr) have
+        only 65% win rate vs 86% in downtrends, losing ~1,668 AED per trade.
+        """
+        cfg = self.get_config(security)
+        
+        if not cfg.get('trend_filter_sell_enabled', True):
+            return False
+        
+        threshold = cfg.get('trend_filter_sell_threshold_bps_hr', 10.0)
+        
+        # Calculate current trend slope
+        slope = self.calculate_trend_slope(security)
+        self.daily_trend_slope[security] = slope
+        
+        # Filter if slope exceeds threshold (strong uptrend)
+        if slope > threshold:
+            self.filtered_sell_entries[security] = self.filtered_sell_entries.get(security, 0) + 1
+            return True
+        
+        return False
+    
+    def should_filter_buy_entry(self, security: str) -> bool:
+        """
+        Check if BUY entry should be filtered based on trend.
+        
+        Returns True if:
+        - trend_filter_buy_enabled is True
+        - Daily trend slope is below -trend_filter_buy_threshold_bps_hr (downtrend)
+        
+        This is the mirror of should_filter_sell_entry - filters BUY in downtrends.
+        """
+        cfg = self.get_config(security)
+        
+        if not cfg.get('trend_filter_buy_enabled', False):
+            return False
+        
+        threshold = cfg.get('trend_filter_buy_threshold_bps_hr', 10.0)
+        
+        # Calculate current trend slope (may already be calculated)
+        slope = self.calculate_trend_slope(security)
+        self.daily_trend_slope[security] = slope
+        
+        # Filter if slope is below negative threshold (strong downtrend)
+        if slope < -threshold:
+            self.filtered_buy_entries[security] = self.filtered_buy_entries.get(security, 0) + 1
+            return True
+        
+        return False
     
     def update_vwap(self, security: str, price: float, volume: int):
         """Update VWAP calculation with a trade."""
@@ -328,7 +457,16 @@ class ClosingStrategy:
         return None
     
     def place_auction_orders(self, security: str, vwap: float, timestamp: datetime):
-        """Place buy and sell orders for the closing auction."""
+        """
+        Place buy and sell orders for the closing auction.
+        
+        Entry filtering based on trend (if trend_filter_enabled=True):
+        - SELL filtered if trend > threshold (uptrend) 
+        - BUY filtered if trend < -threshold (downtrend) AND trend_filter_sell_only=False
+        
+        Based on analysis: SELL entries in uptrends (>10 bps/hr) have 65% win rate 
+        vs 86% in downtrends, losing ~1,668 AED per filtered trade.
+        """
         cfg = self.get_config(security)
         spread_pct = cfg['spread_vwap_pct'] / 100.0
         
@@ -346,8 +484,12 @@ class ClosingStrategy:
         buy_price = self.round_to_tick(buy_price_raw, buy_tick_size)
         sell_price = self.round_to_tick(sell_price_raw, sell_tick_size)
         
-        # Place buy order
-        if quantity > 0:
+        # Check if entries should be filtered based on trend
+        filter_sell = self.should_filter_sell_entry(security)
+        filter_buy = self.should_filter_buy_entry(security)
+        
+        # Place buy order (if not filtered)
+        if quantity > 0 and not filter_buy:
             self.auction_orders[security]['buy'] = AuctionOrder(
                 price=buy_price,
                 quantity=quantity,
@@ -356,7 +498,8 @@ class ClosingStrategy:
                 vwap_reference=vwap
             )
         
-            # Place sell order
+        # Place sell order (if not filtered)
+        if quantity > 0 and not filter_sell:
             self.auction_orders[security]['sell'] = AuctionOrder(
                 price=sell_price,
                 quantity=quantity,
@@ -624,13 +767,22 @@ class ClosingStrategy:
     def get_summary(self, security: str) -> dict:
         """Get summary statistics for a security."""
         trades = self.trades.get(security, [])
+        
+        # Count buy vs sell entries
+        buy_entries = len([t for t in trades if t.trade_type == 'auction_entry' and t.side == 'buy'])
+        sell_entries = len([t for t in trades if t.trade_type == 'auction_entry' and t.side == 'sell'])
+        
         return {
             'security': security,
             'total_trades': len(trades),
             'auction_entries': len([t for t in trades if t.trade_type == 'auction_entry']),
+            'buy_entries': buy_entries,
+            'sell_entries': sell_entries,
             'vwap_exits': len([t for t in trades if t.trade_type == 'vwap_exit']),
             'stop_losses': len([t for t in trades if t.trade_type == 'stop_loss']),
             'eod_flattens': len([t for t in trades if t.trade_type == 'eod_flatten']),
+            'filtered_sell_entries': self.filtered_sell_entries.get(security, 0),
+            'filtered_buy_entries': self.filtered_buy_entries.get(security, 0),
             'realized_pnl': self.pnl.get(security, 0),
             'final_position': self.position.get(security, 0),
         }
